@@ -4,6 +4,7 @@
 #include "GameState.h"
 #include "Task.h"
 #include "TaskManager.h"
+#include "PresentationManager.h"
 
 #include <vector>
 #include <atomic>
@@ -14,6 +15,13 @@ std::atomic<bool> IsRunning = true;
 std::atomic<Color> ClearColor = BLACK;
 
 std::atomic<float> FPSDeltaTime = 1.0f / 60.0f;
+
+static size_t BackgroundLayer = 0;
+static size_t NPCLayer = 10;
+static size_t PlayerLayer = 20;
+static size_t GUILayer = 100;
+static size_t DebugLayer = 200;
+
 
 float FixedUpdateTime = 1.0f / 60.0f;
 float Accumulator = FixedUpdateTime;
@@ -175,33 +183,43 @@ public:
 
     void RunOneFrame() override
     {
+        PresentationManager::BeginLayer(PlayerLayer);
         for (auto& entity : Entitites)
         {
             if (entity.IsPlayer)
             {
                 DrawRectangleRec(Rectangle(entity.Position.x, entity.Position.y, entity.Size, entity.Size), GREEN);
+                break;
             }
-            else
+        }
+        PresentationManager::EndLayer();
+
+        PresentationManager::BeginLayer(NPCLayer);
+        for (auto& entity : Entitites)
+        {
+            if (!entity.IsPlayer)
             {
                 DrawRectangleRec(Rectangle(entity.Position.x, entity.Position.y, entity.Size, entity.Size), BLUE);
             }
         }
+        PresentationManager::EndLayer();
     }
 };
 
-class PresentTask : public Task
+class OverlayTask : public Task
 {
 public:
-    DECLARE_TASK(DrawTask);
-    PresentTask()
+    DECLARE_TASK(OverlayTask);
+    OverlayTask()
     {
-        DependsOnState = GameState::Present;
-        BlocksState = GameState::PostDraw;
+        DependsOnState = GameState::Draw;
+        BlocksState = GameState::Present;
         RunInMainThread = true;
     }
 
     void RunOneFrame() override
     {
+        PresentationManager::BeginLayer(DebugLayer);
         DrawRectangle(0, 0, 850, 120, ColorAlpha(BLACK, 0.5f));
         DrawFPS(10, 10);
         DrawText(TextFormat("Frame Time %0.3f ms", LastFrameTime * 1000), 100, 10, 20, WHITE);
@@ -218,6 +236,24 @@ public:
             y += 20;
         }
 #endif
+        PresentationManager::EndLayer();
+    }
+};
+
+class PresentTask : public Task
+{
+public:
+    DECLARE_TASK(PresentTask);
+    PresentTask()
+    {
+        DependsOnState = GameState::Present;
+        BlocksState = GameState::PostDraw;
+        RunInMainThread = true;
+    }
+
+    void RunOneFrame() override
+    {
+        PresentationManager::Present();
     }
 };
 
@@ -252,13 +288,14 @@ void GameInit()
     TaskManager::AddTask<PlayerMovementTask>(inputTask);
     TaskManager::AddTask<AIUpdateTask>();
     TaskManager::AddTask<DrawTask>(); 
+    TaskManager::AddTask<OverlayTask>();
     TaskManager::AddTask<PresentTask>();
 
     Entitites.push_back(Entity(true, Vector2(100, 100), Vector2Zeros, 10));
 
     constexpr float nonPlayerSize = 20;
     constexpr float nonPlayerSpeed = 20;
-    constexpr size_t npcCount = 4000;
+    constexpr size_t npcCount = 200;
 
     for (size_t i = 0; i < npcCount; i++)
     {
@@ -267,6 +304,15 @@ void GameInit()
 
         Entitites.push_back(Entity(false, pos, vel, nonPlayerSize));
     }
+
+    PresentationManager::Init();
+
+    // create the presentation layers
+    BackgroundLayer = PresentationManager::DefineLayer(uint8_t(BackgroundLayer));
+    NPCLayer = PresentationManager::DefineLayer(uint8_t(NPCLayer));
+    PlayerLayer = PresentationManager::DefineLayer(uint8_t(PlayerLayer));
+    GUILayer = PresentationManager::DefineLayer(uint8_t(GUILayer));
+    DebugLayer = PresentationManager::DefineLayer(uint8_t(DebugLayer));
 }
 
 void GameCleanup()
@@ -287,6 +333,8 @@ int main()
 #endif
         if (IsWindowResized())
             WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
+
+        PresentationManager::Update();
 
         ClearBackground(ClearColor.load());
 
