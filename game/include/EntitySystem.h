@@ -8,18 +8,16 @@
 #include <execution>
 
 #define DECLARE_COMPONENT(CompoentName) \
- static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); }
+static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); }
 
 #define DECLARE_SIMPLE_COMPONENT(CompoentName) \
- static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); } \
- CompoentName(size_t entityId) : EntityComponent(entityId) {}
-
+static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); } \
+CompoentName(size_t entityId) : EntityComponent(entityId) {}
 
 namespace EntitySystem
 {
     struct EntityComponent;
    
-
     struct IComponentTable
     {
         virtual EntityComponent* Add(size_t id) = 0;
@@ -101,7 +99,7 @@ namespace EntitySystem
             return &Components[itr->second];
         }
 
-        void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false)
+        void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false) override
         {
             if (paralel)
             {

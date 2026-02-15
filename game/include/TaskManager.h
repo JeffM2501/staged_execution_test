@@ -49,7 +49,7 @@ namespace TaskManager
 {
     extern std::vector<std::unique_ptr<Task>> Tasks;
 
-    static constexpr float FixedFPS = 60.0f;
+    static constexpr float FixedFPS = 30.0f;
 
     void Init();
     void Cleanup();

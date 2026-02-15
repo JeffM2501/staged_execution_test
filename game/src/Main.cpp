@@ -7,6 +7,7 @@
 #include "TimeUtils.h"
 #include "PresentationManager.h"
 #include "EntitySystem.h"
+#include "ValueTracker.h"
 
 #include <atomic>
 
@@ -24,6 +25,8 @@ static size_t GUILayer = 100;
 static size_t DebugLayer = 200;
 
 double LastFrameTime = 0;
+
+ValueTracker FameTimeTracker(500, "FrameTime");
 
 struct BoundingBox2D
 {
@@ -228,11 +231,11 @@ public:
                 auto transform = npc.GetEntityComponent<TransformComponent>();
                 if (transform)
                 {
-                    Vector2 interpPos = transform->Position;
+                    Vector2 interpPos = transform->Position - Vector2(npc.Size, npc.Size);
                     if (UseInterpolateNPCs)
                         interpPos += transform->Velocity * float(now - npc.LastUpdateTime);
 
-                    DrawRectangleRec(Rectangle(interpPos.x, interpPos.y, npc.Size, npc.Size), npc.Tint);
+                    DrawRectangleRec(Rectangle(interpPos.x, interpPos.y, npc.Size*2, npc.Size*2), npc.Tint);
                 }
             });
         PresentationManager::EndLayer();
@@ -264,6 +267,9 @@ public:
             DrawText("Interpolation: ON (Press Space to toggle)", x, y, 20, GREEN);
         else
             DrawText("Interpolation: OFF (Press Space to toggle)", x, y, 20, RED);
+
+        Rectangle graphBounds = { float(x + 450), float(y+3), 400, 50 };
+        FameTimeTracker.DrawGraph(graphBounds);
 
 #if defined(DEBUG)
         y = 30;
@@ -399,6 +405,9 @@ int main()
         TaskManager::TickFrame();
 
         LastFrameTime = GetTime() - frameStartTime;
+
+        FameTimeTracker.AddValue(float(LastFrameTime));
+
         if (WindowShouldClose())
             IsRunning.store(false);
     }
