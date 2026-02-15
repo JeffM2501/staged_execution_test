@@ -1,8 +1,10 @@
 #pragma once
 
-enum class GameState
+#include <cstdint>
+
+enum class GameState : uint8_t
 {
-    None,
+    None = 0,
     FrameHead,
     PreUpdate,
     Update,
@@ -13,6 +15,7 @@ enum class GameState
     Present,
     PostDraw,
     FrameTail,
+    AutoNextState = 255
 };
 
 // Operator overloads for GameState to use in for loops
@@ -49,7 +52,6 @@ inline bool operator>(GameState lhs, GameState rhs)
     return static_cast<int>(lhs) > static_cast<int>(rhs);
 }
 
-
 static constexpr const char* GetStateName(GameState state)
 {
     switch (state)
@@ -65,6 +67,25 @@ static constexpr const char* GetStateName(GameState state)
     case GameState::Present: return "Present";
     case GameState::PostDraw: return "PostDraw";
     case GameState::FrameTail: return "FrameTail";
+    case GameState::AutoNextState: return "AutoNext";
     default: return "Unknown";
     }
 }
+
+static GameState GetNextState(GameState state)
+{
+    switch (state)
+    {
+    case GameState::FrameHead: return GameState::PreUpdate;
+    case GameState::PreUpdate: return GameState::Update;
+    case GameState::Update: return GameState::PostUpdate;
+    case GameState::FixedUpdate: return GameState::PostUpdate;
+    case GameState::PostUpdate: return GameState::PreDraw;
+    case GameState::PreDraw: return GameState::Draw;
+    case GameState::Draw: return GameState::Present;
+    case GameState::Present: return GameState::PostDraw;
+    case GameState::PostDraw: return GameState::FrameTail;
+    default: return GameState::None;
+    }
+}
+

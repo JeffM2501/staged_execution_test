@@ -26,7 +26,7 @@ static size_t DebugLayer = 200;
 
 double LastFrameTime = 0;
 
-ValueTracker FameTimeTracker(500, "FrameTime");
+ValueTracker FameTimeTracker(144, "FrameTime");
 
 struct BoundingBox2D
 {
@@ -72,14 +72,13 @@ public:
     InputTask()
     {
         DependsOnState = GameState::PreUpdate;
-        BlocksState = GameState::Update;
         RunInMainThread = true;
     }
 
     Vector2 InputVector = { 0.0f, 0.0f };
 
 protected:
-    void RunOneFrame() override
+    void Tick() override
     {
         InputVector = { 0.0f, 0.0f };
 
@@ -115,13 +114,12 @@ public:
         : Input(input)
     {
         DependsOnState = GameState::Update;
-        BlocksState = GameState::PostUpdate;
     }
 
     float PlayerSpeed = 100.0f;
     InputTask* Input = nullptr;
 protected:
-    void RunOneFrame() override
+    void Tick() override
     {
         EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
             {
@@ -177,10 +175,9 @@ public:
     AIUpdateTask()
     {
         DependsOnState = GameState::FixedUpdate;
-        BlocksState = GameState::None;
     }
 protected:
-    void RunOneFrame() override
+    void Tick() override
     {
         double updateTime = GetTime();
         EntitySystem::DoForEachComponent<NPCComponent>([&](NPCComponent& npc)
@@ -204,11 +201,10 @@ public:
     DrawTask()
     {
         DependsOnState = GameState::Draw;
-        BlocksState = GameState::Present;
         RunInMainThread = true;
     }
 
-    void RunOneFrame() override
+    void Tick() override
     {
         PresentationManager::BeginLayer(PlayerLayer);
 
@@ -249,16 +245,16 @@ public:
     OverlayTask()
     {
         DependsOnState = GameState::Draw;
-        BlocksState = GameState::Present;
         RunInMainThread = true;
     }
 
-    void RunOneFrame() override
+    void Tick() override
     {
         PresentationManager::BeginLayer(DebugLayer);
-        DrawRectangle(0, 0, 850, 120, ColorAlpha(BLACK, 0.5f));
+        DrawRectangle(0, 0, 750, 80, ColorAlpha(DARKBLUE, 0.85f));
         DrawFPS(10, 10);
-        DrawText(TextFormat("Frame Time %0.3f ms", LastFrameTime * 1000), 100, 10, 20, WHITE);
+        if (LastFrameTime > 0)
+            DrawText(TextFormat("Instant %0.1fFPS", 1.0f/LastFrameTime), 100, 10, 20, WHITE);
 
         int x = 320;
         int y = 10;
@@ -287,7 +283,10 @@ public:
                 stats.BlockedDurration * 1000.0,
                 stats.MaxBlockedDurration * 1000.0);
 
-            DrawText(text, 10, y, 10, GRAY);
+            DrawText(text, 20, y, 10, GRAY);
+
+            DrawRectangle(5, y, 8, 8, stats.TickedThisFrame ? GREEN : RED);
+
             y += 10;
         }
 #endif
@@ -302,11 +301,10 @@ public:
     PresentTask()
     {
         DependsOnState = GameState::Present;
-        BlocksState = GameState::PostDraw;
         RunInMainThread = true;
     }
 
-    void RunOneFrame() override
+    void Tick() override
     {
         PresentationManager::Present();
     }
@@ -334,8 +332,8 @@ void GameInit()
     TaskManager::Init();
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(1280, 800, "Engine Engine");
-    SetTargetFPS(144);
+    InitWindow(1280, 800, "Task Test");
+    SetTargetFPS(GetMonitorRefreshRate(0));
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
     FPSDeltaTime = 1.0f / float(GetMonitorRefreshRate(0));
 

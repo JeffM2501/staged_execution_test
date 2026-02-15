@@ -17,7 +17,9 @@ class Task
 protected:
     std::atomic<bool> Completed = false;
 
-    virtual void RunOneFrame() = 0;
+    virtual void Tick() = 0;
+
+    GameState BlocksState = GameState::AutoNextState;
 public:
     virtual size_t TaskId() = 0;
 
@@ -50,11 +52,13 @@ public:
     }
 
     GameState DependsOnState = GameState::FrameHead;
-    GameState BlocksState = GameState::FrameTail;
+   
+    GameState GetBlocksState();
 
     bool RunInMainThread = false;
 
     std::vector<std::unique_ptr<Task>> Dependencies;
+    std::atomic<bool> TickedThisFrame = false;
 };
 
 

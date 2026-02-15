@@ -42,6 +42,8 @@ struct GameStateStats
 
     double MaxDurration = 0;
     double MaxBlockedDurration = 0;
+
+    bool TickedThisFrame = false;
 };
 #endif
 
@@ -49,7 +51,7 @@ namespace TaskManager
 {
     extern std::vector<std::unique_ptr<Task>> Tasks;
 
-    static constexpr float FixedFPS = 30.0f;
+    static constexpr float FixedFPS = 50.0f;
 
     void Init();
     void Cleanup();

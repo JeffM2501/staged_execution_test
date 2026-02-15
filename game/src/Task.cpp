@@ -2,8 +2,9 @@
 
 void Task::Execute()
 {
+    TickedThisFrame.store(true);
     Completed.store(false);
-    RunOneFrame();
+    Tick();
     for (auto& dependency : Dependencies)
     {
         dependency->Execute();
@@ -14,4 +15,12 @@ void Task::Execute()
 bool Task::IsComplete()
 {
     return Completed.load();
+}
+
+GameState Task::GetBlocksState()
+{
+    if (BlocksState != GameState::AutoNextState)
+        return BlocksState;
+
+    return GetNextState(DependsOnState);
 }

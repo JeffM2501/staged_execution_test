@@ -109,21 +109,28 @@ namespace TaskManager
 
     void TickFrame()
     {
+        for (auto& task : Tasks)
+            task->TickedThisFrame.store(false);
+
         Accumulator += GetDeltaTime();
 
         for (GameState state = GameState::FrameHead; state <= GameState::FrameTail; ++state)
         {
+#if defined(DEBUG)
+            auto& stats = GetStatsForState(state);
+            stats.TickedThisFrame = false;
+#endif
             if (state == GameState::FixedUpdate)
             {
                 while (Accumulator >= FixedUpdateTime)
                 {
-                    TaskManager::RunTasksForState(GameState::FixedUpdate);
+                    RunTasksForState(GameState::FixedUpdate);
                     Accumulator -= FixedUpdateTime;
                 }
             }
             else
             {
-                TaskManager::RunTasksForState(state);
+                RunTasksForState(state);
                 if (state == GameState::Present)
                     EndDrawing();
             }
@@ -134,7 +141,7 @@ namespace TaskManager
     {
         for (auto& task : Tasks)
         {
-            if (task->BlocksState == state && !task->IsComplete())
+            if (task->GetBlocksState() == state && !task->IsComplete())
             {
                 return true;
             }
@@ -157,6 +164,7 @@ namespace TaskManager
         stats.BlockedDurration = 0;
         stats.Durration = 0;
         stats.StartTime = GetTime();
+        stats.TickedThisFrame = true;
 #endif
         bool wasBlocked = false;
         while (IsStateBlocked(state))

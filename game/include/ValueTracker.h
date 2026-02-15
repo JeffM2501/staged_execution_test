@@ -11,6 +11,7 @@ public:
     std::vector<float> Values;
     int NextValueIndex = 0;
     std::string Name;
+    std::string Suffix = "ms";
 
     float Max = 0;
     float Min = 0;
@@ -71,6 +72,15 @@ public:
         }
 
         if (NextValueIndex > 0)
-            DrawText(TextFormat("%s\nCurrent %0.3f\nMax %0.3f\nMin %0.3f", Name.c_str(), Values[NextValueIndex-1] * ValueScale, Max * ValueScale, Min * ValueScale), bounds.x + bounds.width + 2, bounds.y, 10, GRAY);
+        {
+            const char* text = TextFormat("%s\nCurrent %0.3f%s\nMax %0.3f%s\nMin %0.3f%s", 
+                Name.c_str(), 
+                Values[NextValueIndex - 1] * ValueScale, Suffix.c_str(),
+                Max * ValueScale, Suffix.c_str(),
+                Min * ValueScale, Suffix.c_str());
+
+            DrawText(text, int(bounds.x + bounds.width + 2), int(bounds.y), 10, LIGHTGRAY);
+
+        }
     }
 };
