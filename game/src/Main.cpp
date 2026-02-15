@@ -4,12 +4,13 @@
 #include "GameState.h"
 #include "Task.h"
 #include "TaskManager.h"
+#include "TimeUtils.h"
 #include "PresentationManager.h"
+#include "EntitySystem.h"
 
-#include <vector>
 #include <atomic>
-#include <algorithm>
-#include <execution>
+
+bool UseInterpolateNPCs = true;
 
 std::atomic<bool> IsRunning = true;
 std::atomic<Color> ClearColor = BLACK;
@@ -21,10 +22,6 @@ static size_t NPCLayer = 10;
 static size_t PlayerLayer = 20;
 static size_t GUILayer = 100;
 static size_t DebugLayer = 200;
-
-
-float FixedUpdateTime = 1.0f / 60.0f;
-float Accumulator = FixedUpdateTime;
 
 double LastFrameTime = 0;
 
@@ -40,15 +37,30 @@ float GetDeltaTime()
     return FPSDeltaTime.load();
 }
 
-struct Entity
+struct TransformComponent : public EntitySystem::EntityComponent
 {
-    bool IsPlayer = false;
     Vector2 Position = Vector2Zeros;
     Vector2 Velocity = Vector2Zeros;
-    float Size = 0;
+    DECLARE_SIMPLE_COMPONENT(TransformComponent);
 };
 
-std::vector<Entity> Entitites;
+struct PlayerComponent : public EntitySystem::EntityComponent
+{
+    DECLARE_SIMPLE_COMPONENT(PlayerComponent);
+
+    Vector2 Input = Vector2Zeros;
+
+    float Size = 10;
+    float Health = 100;
+};
+
+struct NPCComponent : public EntitySystem::EntityComponent
+{
+    DECLARE_SIMPLE_COMPONENT(NPCComponent);
+    float Size = 20;
+    Color Tint = BLUE;
+    double LastUpdateTime = 0;
+};
 
 class InputTask : public Task
 {
@@ -76,11 +88,19 @@ protected:
             InputVector.x -= 1.0f;
         if (IsKeyDown(KEY_D))
             InputVector.x += 1.0f;
-        
+
+        if (IsKeyPressed(KEY_SPACE))
+            UseInterpolateNPCs = !UseInterpolateNPCs;
+
         if (Vector2Length(InputVector) > 1.0f)
         {
             InputVector = Vector2Normalize(InputVector);
         }
+
+        EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
+            {
+                player.Input = InputVector;
+            });
     }
 };
 
@@ -100,45 +120,45 @@ public:
 protected:
     void RunOneFrame() override
     {
-        for (auto& entity : Entitites)
-        {
-            if (!entity.IsPlayer)
-                continue;
-
-            entity.Position += Input->InputVector * PlayerSpeed * GetDeltaTime();
-            return;
-        }
+        EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
+            {
+                auto transform = player.GetEntityComponent<TransformComponent>();
+                if (transform)
+                {
+                    transform->Position += player.Input * PlayerSpeed * GetDeltaTime();
+                }
+            });
     }
 };
 
-bool MoveEntity(Entity& entity, Vector2 delta, const BoundingBox2D & bounds)
+bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const BoundingBox2D & bounds)
 {
     bool hit = false;
 
     Vector2 newPos = entity.Position + delta;
 
-    if (newPos.x > bounds.Max.x - entity.Size)
+    if (newPos.x > bounds.Max.x - size)
     {
-        newPos.x = bounds.Max.x - entity.Size;
+        newPos.x = bounds.Max.x - size;
         entity.Velocity.x *= -1;
         hit = true;
     }
-    else if (newPos.x < bounds.Min.x + entity.Size)
+    else if (newPos.x < bounds.Min.x + size)
     {
-        newPos.x = bounds.Min.x + entity.Size;
+        newPos.x = bounds.Min.x + size;
         entity.Velocity.x *= -1;
         hit = true;
     }
 
-    if (newPos.y > bounds.Max.y - entity.Size)
+    if (newPos.y > bounds.Max.y - size)
     {
-        newPos.y = bounds.Max.y - entity.Size;
+        newPos.y = bounds.Max.y - size;
         entity.Velocity.y *= -1;
         hit = true;
     }
-    else if (newPos.y < bounds.Min.y + entity.Size)
+    else if (newPos.y < bounds.Min.y + size)
     {
-        newPos.y = bounds.Min.y + entity.Size;
+        newPos.y = bounds.Min.y + size;
         entity.Velocity.y *= -1;
         hit = true;
     }
@@ -159,14 +179,18 @@ public:
 protected:
     void RunOneFrame() override
     {
-        std::for_each(std::execution::par, Entitites.begin(), Entitites.end(),[]
-        (auto& entity)
+        double updateTime = GetTime();
+        EntitySystem::DoForEachComponent<NPCComponent>([&](NPCComponent& npc)
             {
-                if (entity.IsPlayer)
-                    return;
-
-                MoveEntity(entity, entity.Velocity * GetDeltaTime(), WorldBounds.load());
-            });
+                auto transform = npc.GetEntityComponent<TransformComponent>();
+                if (transform)
+                {
+                    float delta = TaskManager::GetFixedDeltaTime();
+                    MoveEntity(*transform, npc.Size, transform->Velocity * delta, WorldBounds.load());
+                    npc.LastUpdateTime = updateTime;
+                }
+            }, 
+            true);
     }
 };
 
@@ -184,24 +208,33 @@ public:
     void RunOneFrame() override
     {
         PresentationManager::BeginLayer(PlayerLayer);
-        for (auto& entity : Entitites)
-        {
-            if (entity.IsPlayer)
+
+        EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
             {
-                DrawRectangleRec(Rectangle(entity.Position.x, entity.Position.y, entity.Size, entity.Size), GREEN);
-                break;
-            }
-        }
+                auto transform = player.GetEntityComponent<TransformComponent>();
+                if (transform)
+                {
+                    DrawCircleV(transform->Position, player.Size, GREEN);
+                }
+            });
+
         PresentationManager::EndLayer();
 
         PresentationManager::BeginLayer(NPCLayer);
-        for (auto& entity : Entitites)
-        {
-            if (!entity.IsPlayer)
+
+        double now = GetTime();
+        EntitySystem::DoForEachComponent<NPCComponent>([&](NPCComponent& npc)
             {
-                DrawRectangleRec(Rectangle(entity.Position.x, entity.Position.y, entity.Size, entity.Size), BLUE);
-            }
-        }
+                auto transform = npc.GetEntityComponent<TransformComponent>();
+                if (transform)
+                {
+                    Vector2 interpPos = transform->Position;
+                    if (UseInterpolateNPCs)
+                        interpPos += transform->Velocity * float(now - npc.LastUpdateTime);
+
+                    DrawRectangleRec(Rectangle(interpPos.x, interpPos.y, npc.Size, npc.Size), npc.Tint);
+                }
+            });
         PresentationManager::EndLayer();
     }
 };
@@ -224,16 +257,32 @@ public:
         DrawFPS(10, 10);
         DrawText(TextFormat("Frame Time %0.3f ms", LastFrameTime * 1000), 100, 10, 20, WHITE);
 
+        int x = 320;
+        int y = 10;
+
+        if (UseInterpolateNPCs)
+            DrawText("Interpolation: ON (Press Space to toggle)", x, y, 20, GREEN);
+        else
+            DrawText("Interpolation: OFF (Press Space to toggle)", x, y, 20, RED);
+
 #if defined(DEBUG)
-        int y = 30;
+        y = 30;
         for (GameState state = GameState::FrameHead; state <= GameState::FrameTail; ++state)
         {
             auto& stats = TaskManager::GetStatsForState(state);
             if (stats.TaskCount == 0)
                 continue;
 
-            DrawText(TextFormat("%s %d Tasks in %0.3f ms [Max %0.3f] (Blocked for %0.3f ms [Max %0.3f])", GetStateName(state), stats.TaskCount, stats.Durration * 1000.0, stats.MaxDurration * 1000.0, stats.BlockedDurration * 1000.0, stats.MaxBlockedDurration * 1000.0), 10, y, 20, GRAY);
-            y += 20;
+            const char* text = TextFormat("%s %d Tasks in %0.3f ms [Max %0.3f] (Blocked for %0.3f ms [Max %0.3f])", 
+                GetStateName(state),
+                stats.TaskCount, 
+                stats.Durration * 1000.0,
+                stats.MaxDurration * 1000.0,
+                stats.BlockedDurration * 1000.0,
+                stats.MaxBlockedDurration * 1000.0);
+
+            DrawText(text, 10, y, 10, GRAY);
+            y += 10;
         }
 #endif
         PresentationManager::EndLayer();
@@ -279,7 +328,7 @@ void GameInit()
     TaskManager::Init();
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(1280, 800, "Example");
+    InitWindow(1280, 800, "Engine Engine");
     SetTargetFPS(144);
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
     FPSDeltaTime = 1.0f / float(GetMonitorRefreshRate(0));
@@ -291,18 +340,25 @@ void GameInit()
     TaskManager::AddTask<OverlayTask>();
     TaskManager::AddTask<PresentTask>();
 
-    Entitites.push_back(Entity(true, Vector2(100, 100), Vector2Zeros, 10));
+    EntitySystem::RegisterComponent<TransformComponent>();
+    EntitySystem::RegisterComponent<PlayerComponent>();
+    EntitySystem::RegisterComponent<NPCComponent>();
+
+    auto player = EntitySystem::AddComponent<PlayerComponent>(EntitySystem::NewEntityId());
+    player->AddComponent<TransformComponent>()->Position = Vector2(100, 200);
+    player->Size = 10;
+    player->Health = 100;
 
     constexpr float nonPlayerSize = 20;
-    constexpr float nonPlayerSpeed = 20;
+    constexpr float nonPlayerSpeed = 50;
     constexpr size_t npcCount = 200;
 
     for (size_t i = 0; i < npcCount; i++)
     {
-        Vector2 pos = GetRandomPosInBounds(WorldBounds, nonPlayerSize);
-        Vector2 vel = GetRandomVector(nonPlayerSpeed);
-
-        Entitites.push_back(Entity(false, pos, vel, nonPlayerSize));
+        auto npc = EntitySystem::AddComponent<NPCComponent>(EntitySystem::NewEntityId());
+        auto transform = npc->AddComponent<TransformComponent>();
+        transform->Position = GetRandomPosInBounds(WorldBounds, nonPlayerSize);
+        transform->Velocity = GetRandomVector(nonPlayerSpeed);
     }
 
     PresentationManager::Init();
@@ -338,27 +394,9 @@ int main()
 
         ClearBackground(ClearColor.load());
 
-        Accumulator += GetDeltaTime();
-
         double frameStartTime = GetTime();
 
-        for (GameState state = GameState::FrameHead; state <= GameState::FrameTail; ++state)
-        {
-            if (state == GameState::FixedUpdate)
-            {
-                while (Accumulator >= FixedUpdateTime)
-                {
-                    TaskManager::RunTasksForState(GameState::FixedUpdate);
-                    Accumulator -= FixedUpdateTime;
-                }
-            }
-            else
-            {
-                TaskManager::RunTasksForState(state);
-                if (state == GameState::Present)
-                    EndDrawing();
-            }
-        } 
+        TaskManager::TickFrame();
 
         LastFrameTime = GetTime() - frameStartTime;
         if (WindowShouldClose())

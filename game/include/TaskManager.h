@@ -49,8 +49,12 @@ namespace TaskManager
 {
     extern std::vector<std::unique_ptr<Task>> Tasks;
 
+    static constexpr float FixedFPS = 60.0f;
+
     void Init();
     void Cleanup();
+
+    void TickFrame();
 
     template<typename T, typename... Args>
     T* AddTask(Args&&... args)
@@ -90,6 +94,8 @@ namespace TaskManager
     bool IsIdle();
     void AddTask(std::unique_ptr<Task> task);
     void AbortAll();
+
+    inline float GetFixedDeltaTime() { return 1.0f / FixedFPS; }
 
 #if defined(DEBUG)
     GameStateStats& GetStatsForState(GameState state);

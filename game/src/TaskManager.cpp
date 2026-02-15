@@ -1,4 +1,6 @@
 #include "TaskManager.h"
+#include "TimeUtils.h"
+
 #include "raylib.h"
 
 #include <unordered_map>
@@ -78,6 +80,9 @@ namespace TaskManager
 
     size_t NextThreadIndex = 0;
 
+    float FixedUpdateTime = 1.0f / FixedFPS;
+    float Accumulator = FixedUpdateTime;
+
     void Init()
     {
         for (size_t i = 0; i < std::thread::hardware_concurrency(); i++)
@@ -100,6 +105,29 @@ namespace TaskManager
         }
         Threads.clear();
         Tasks.clear();
+    }
+
+    void TickFrame()
+    {
+        Accumulator += GetDeltaTime();
+
+        for (GameState state = GameState::FrameHead; state <= GameState::FrameTail; ++state)
+        {
+            if (state == GameState::FixedUpdate)
+            {
+                while (Accumulator >= FixedUpdateTime)
+                {
+                    TaskManager::RunTasksForState(GameState::FixedUpdate);
+                    Accumulator -= FixedUpdateTime;
+                }
+            }
+            else
+            {
+                TaskManager::RunTasksForState(state);
+                if (state == GameState::Present)
+                    EndDrawing();
+            }
+        }
     }
 
     bool IsStateBlocked(GameState state)
