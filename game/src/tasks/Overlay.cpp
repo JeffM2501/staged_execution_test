@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "GameInfo.h"
 #include "PresentationManager.h"
+#include "TaskManager.h"
 
 void OverlayTask::Tick()
 {
