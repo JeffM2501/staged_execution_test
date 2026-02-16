@@ -2,6 +2,7 @@
 
 #include "raylib.h"
 
+#include <cstddef>
 #include <cstdint>
 namespace PresentationManager
 {
