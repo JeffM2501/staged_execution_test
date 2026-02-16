@@ -10,6 +10,16 @@
 #include "ValueTracker.h"
 #include "ComponentTasks.h"
 
+#include "GameInfo.h"
+
+#include "components/TransformComponent.h"
+#include "components/PlayerComponent.h"
+#include "components/NPCComponent.h"
+
+#include "tasks/Input.h"
+#include "tasks/Draw.h"
+#include "tasks/Overlay.h"
+
 #include <atomic>
 
 bool UseInterpolateNPCs = true;
@@ -19,269 +29,22 @@ std::atomic<Color> ClearColor = BLACK;
 
 std::atomic<float> FPSDeltaTime = 1.0f / 60.0f;
 
-static size_t BackgroundLayer = 0;
-static size_t NPCLayer = 10;
-static size_t PlayerLayer = 20;
-static size_t GUILayer = 100;
-static size_t DebugLayer = 200;
+size_t BackgroundLayer = 0;
+size_t NPCLayer = 10;
+size_t PlayerLayer = 20;
+size_t GUILayer = 100;
+size_t DebugLayer = 200;
 
 double LastFrameTime = 0;
 
 ValueTracker FameTimeTracker(144, "FrameTime");
 
-struct BoundingBox2D
-{
-    Vector2 Min = Vector2Zeros;
-    Vector2 Max = Vector2Zeros;
-};
 std::atomic<BoundingBox2D> WorldBounds;
 
 float GetDeltaTime()
 {
     return FPSDeltaTime.load();
 }
-
-
-struct TransformComponent : public EntitySystem::EntityComponent
-{
-    Vector2 Position = Vector2Zeros;
-    Vector2 Velocity = Vector2Zeros;
-    DECLARE_SIMPLE_COMPONENT(TransformComponent);
-};
-
-
-bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const BoundingBox2D& bounds)
-{
-    bool hit = false;
-
-    Vector2 newPos = entity.Position + delta;
-
-    if (newPos.x > bounds.Max.x - size)
-    {
-        newPos.x = bounds.Max.x - size;
-        entity.Velocity.x *= -1;
-        hit = true;
-    }
-    else if (newPos.x < bounds.Min.x + size)
-    {
-        newPos.x = bounds.Min.x + size;
-        entity.Velocity.x *= -1;
-        hit = true;
-    }
-
-    if (newPos.y > bounds.Max.y - size)
-    {
-        newPos.y = bounds.Max.y - size;
-        entity.Velocity.y *= -1;
-        hit = true;
-    }
-    else if (newPos.y < bounds.Min.y + size)
-    {
-        newPos.y = bounds.Min.y + size;
-        entity.Velocity.y *= -1;
-        hit = true;
-    }
-
-    entity.Position = newPos;
-    return hit;
-}
-
-struct PlayerComponent : public EntitySystem::EntityComponent
-{
-    DECLARE_SIMPLE_COMPONENT(PlayerComponent);
-
-    Vector2 Input = Vector2Zeros;
-
-    float Size = 10;
-    float Health = 100;
-
-    float PlayerSpeed = 100.0f;
-
-    void Update()
-    {
-        auto transform = GetEntityComponent<TransformComponent>();
-        if (transform)
-        {
-            transform->Position += Input * PlayerSpeed * GetDeltaTime();
-        }
-    }
-};
-
-struct NPCComponent : public EntitySystem::EntityComponent
-{
-    DECLARE_SIMPLE_COMPONENT(NPCComponent);
-    float Size = 20;
-    Color Tint = BLUE;
-    double LastUpdateTime = 0;
-
-    void Update()
-    {
-        auto transform = GetEntityComponent<TransformComponent>();
-        if (transform)
-        {
-            float delta = TaskManager::GetFixedDeltaTime();
-            MoveEntity(*transform, Size, transform->Velocity * delta, WorldBounds.load());
-            LastUpdateTime = GetFrameStartTime();
-        }
-    }
-};
-
-class InputTask : public Task
-{
-public:
-    DECLARE_TASK(InputTask);
-    InputTask()
-    {
-        DependsOnState = GameState::PreUpdate;
-        RunInMainThread = true;
-    }
-
-    Vector2 InputVector = { 0.0f, 0.0f };
-
-protected:
-    void Tick() override
-    {
-        InputVector = { 0.0f, 0.0f };
-
-        if (IsKeyDown(KEY_W))
-            InputVector.y -= 1.0f;
-        if (IsKeyDown(KEY_S))
-            InputVector.y += 1.0f;
-        if (IsKeyDown(KEY_A))
-            InputVector.x -= 1.0f;
-        if (IsKeyDown(KEY_D))
-            InputVector.x += 1.0f;
-
-        if (IsKeyPressed(KEY_SPACE))
-            UseInterpolateNPCs = !UseInterpolateNPCs;
-
-        if (Vector2Length(InputVector) > 1.0f)
-        {
-            InputVector = Vector2Normalize(InputVector);
-        }
-
-        EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
-            {
-                player.Input = InputVector;
-            });
-    }
-};
-
-class DrawTask : public Task
-{
-public:
-    DECLARE_TASK(DrawTask);
-    DrawTask()
-    {
-        DependsOnState = GameState::Draw;
-        RunInMainThread = true;
-    }
-
-    void Tick() override
-    {
-        PresentationManager::BeginLayer(PlayerLayer);
-
-        EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
-            {
-                auto transform = player.GetEntityComponent<TransformComponent>();
-                if (transform)
-                {
-                    DrawCircleV(transform->Position, player.Size, GREEN);
-                }
-            });
-
-        PresentationManager::EndLayer();
-
-        PresentationManager::BeginLayer(NPCLayer);
-
-        double now = GetTime();
-        EntitySystem::DoForEachComponent<NPCComponent>([&](NPCComponent& npc)
-            {
-                auto transform = npc.GetEntityComponent<TransformComponent>();
-                if (transform)
-                {
-                    Vector2 interpPos = transform->Position - Vector2(npc.Size, npc.Size);
-                    if (UseInterpolateNPCs)
-                        interpPos += transform->Velocity * float(now - npc.LastUpdateTime);
-
-                    DrawRectangleRec(Rectangle(interpPos.x, interpPos.y, npc.Size*2, npc.Size*2), npc.Tint);
-                }
-            });
-        PresentationManager::EndLayer();
-    }
-};
-
-class OverlayTask : public Task
-{
-public:
-    DECLARE_TASK(OverlayTask);
-    OverlayTask()
-    {
-        DependsOnState = GameState::Draw;
-        RunInMainThread = true;
-    }
-
-    void Tick() override
-    {
-        PresentationManager::BeginLayer(DebugLayer);
-        DrawRectangle(0, 0, 750, 80, ColorAlpha(DARKBLUE, 0.85f));
-        DrawFPS(10, 10);
-        if (LastFrameTime > 0)
-            DrawText(TextFormat("Instant %0.1fFPS", 1.0f/LastFrameTime), 100, 10, 20, WHITE);
-
-        int x = 320;
-        int y = 10;
-
-        if (UseInterpolateNPCs)
-            DrawText("Interpolation: ON (Press Space to toggle)", x, y, 20, GREEN);
-        else
-            DrawText("Interpolation: OFF (Press Space to toggle)", x, y, 20, RED);
-
-        Rectangle graphBounds = { float(x + 450), float(y+3), 400, 50 };
-        FameTimeTracker.DrawGraph(graphBounds);
-
-#if defined(DEBUG)
-        y = 30;
-        for (GameState state = GameState::FrameHead; state <= GameState::FrameTail; ++state)
-        {
-            auto& stats = TaskManager::GetStatsForState(state);
-            if (stats.TaskCount == 0)
-                continue;
-
-            const char* text = TextFormat("%s %d Tasks in %0.3f ms [Max %0.3f] (Blocked for %0.3f ms [Max %0.3f])", 
-                GetStateName(state),
-                stats.TaskCount, 
-                stats.Durration * 1000.0,
-                stats.MaxDurration * 1000.0,
-                stats.BlockedDurration * 1000.0,
-                stats.MaxBlockedDurration * 1000.0);
-
-            DrawText(text, 20, y, 10, GRAY);
-
-            DrawRectangle(5, y, 8, 8, stats.TickedThisFrame ? GREEN : RED);
-
-            y += 10;
-        }
-#endif
-        PresentationManager::EndLayer();
-    }
-};
-
-class PresentTask : public Task
-{
-public:
-    DECLARE_TASK(PresentTask);
-    PresentTask()
-    {
-        DependsOnState = GameState::Present;
-        RunInMainThread = true;
-    }
-
-    void Tick() override
-    {
-        PresentationManager::Present();
-    }
-};
 
 Vector2 GetRandomPosInBounds(const BoundingBox2D & bounds, float size)
 {
@@ -313,7 +76,7 @@ void GameInit()
     TaskManager::AddTask<InputTask>();
     TaskManager::AddTask<DrawTask>(); 
     TaskManager::AddTask<OverlayTask>();
-    TaskManager::AddTask<PresentTask>();
+    TaskManager::AddTaskOnState<LambdaTask>(GameState::Present, Hashes::CRC64Str("Present"), []() { PresentationManager::Present(); }, true);
 
     EntitySystem::RegisterComponent<TransformComponent>();
     RegisterComponentWithUpdate<PlayerComponent>(GameState::Update, true);
@@ -332,18 +95,20 @@ void GameInit()
     for (size_t i = 0; i < npcCount; i++)
     {
         auto npc = EntitySystem::AddComponent<NPCComponent>(EntitySystem::NewEntityId());
+        npc->Size = float(GetRandomValue(5, 15));
+        npc->Tint = GetRandomValue(0, 10) >= 5 ? DARKBLUE : DARKPURPLE;
         auto transform = npc->AddComponent<TransformComponent>();
         transform->Position = GetRandomPosInBounds(WorldBounds, nonPlayerSize);
-        transform->Velocity = GetRandomVector(nonPlayerSpeed);
+        transform->Velocity = GetRandomVector(float(GetRandomValue(int(nonPlayerSpeed/2), int(nonPlayerSpeed))));
     }
 
     PresentationManager::Init();
 
     // create the presentation layers
-    BackgroundLayer = PresentationManager::DefineLayer(uint8_t(BackgroundLayer));
+   // BackgroundLayer = PresentationManager::DefineLayer(uint8_t(BackgroundLayer));
     NPCLayer = PresentationManager::DefineLayer(uint8_t(NPCLayer));
     PlayerLayer = PresentationManager::DefineLayer(uint8_t(PlayerLayer));
-    GUILayer = PresentationManager::DefineLayer(uint8_t(GUILayer));
+   // GUILayer = PresentationManager::DefineLayer(uint8_t(GUILayer));
     DebugLayer = PresentationManager::DefineLayer(uint8_t(DebugLayer));
 }
 

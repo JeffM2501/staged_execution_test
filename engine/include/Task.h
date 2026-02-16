@@ -74,7 +74,7 @@ protected:
             TickFunction();
     }
 public:
-    LambdaTask(size_t taskHash, std::function<void()> tick) : TaskHash(taskHash), TickFunction(tick) {}
+    LambdaTask(size_t taskHash, std::function<void()> tick, bool useMainThread = false) : TaskHash(taskHash), TickFunction(tick) { RunInMainThread = useMainThread; }
     size_t TaskId() override { return TaskHash; }
 };
 
