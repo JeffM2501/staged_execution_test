@@ -15,6 +15,8 @@ namespace PresentationManager
     void BeginLayer(size_t layer);
     void EndLayer();
 
+    Rectangle GetCurrentLayerRect();
+
     void SetLayerAlpha(size_t layer, float alpha);
     void SetLayerTint(size_t layer, Color tint);
     void SetLayerOffset(size_t layer, Vector2 tint);

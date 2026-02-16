@@ -167,13 +167,23 @@ namespace EntitySystem
     IComponentTable* GetComponentTable(size_t componentType);
 
     template<class T>
-    T* GetComponentTable()
+    ComponentTable<T>* GetComponentTable()
     {
         auto* table = GetComponentTable(T::GetComponentId());
         if (table->GetComponentType() != T::GetComponentId())
             return nullptr;
 
-        return static_cast<T*>(table);
+        return static_cast<ComponentTable<T>*>(table);
+    }
+
+    template<class T>
+    T* GetFirstComponentOfType()
+    {
+        ComponentTable<T>* table = GetComponentTable<T>();
+        if (!table || table->Components.empty())
+            return nullptr;
+
+        return &table->Components.front();
     }
 
     EntityComponent* AddComponent(size_t entityId, size_t componentType);

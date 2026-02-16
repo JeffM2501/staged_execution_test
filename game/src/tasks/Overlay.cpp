@@ -13,12 +13,12 @@ OverlayTask::OverlayTask()
 void OverlayTask::Tick()
 {
     PresentationManager::BeginLayer(DebugLayer);
-    DrawRectangle(0, 0, 760, 80, ColorAlpha(DARKBLUE, 0.85f));
+    DrawRectangle(0, 0, 750, 100, ColorAlpha(DARKBLUE, 0.85f));
     DrawFPS(10, 10);
     if (LastFrameTime > 0)
         DrawText(TextFormat("Instant %0.1fFPS", 1.0f / LastFrameTime), 100, 10, 20, WHITE);
 
-    int x = 320;
+    int x = 300;
     int y = 10;
 
     if (UseInterpolateNPCs)

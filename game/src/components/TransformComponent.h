@@ -7,8 +7,9 @@
 
 struct TransformComponent : public EntitySystem::EntityComponent
 {
+    DECLARE_SIMPLE_COMPONENT(TransformComponent);
+
     Vector2 Position = Vector2Zeros;
     Vector2 Velocity = Vector2Zeros;
-    DECLARE_SIMPLE_COMPONENT(TransformComponent);
 };
 

@@ -16,8 +16,11 @@ DrawTask::DrawTask()
 
 void DrawTask::Tick()
 {
-    PresentationManager::BeginLayer(PlayerLayer);
+    PresentationManager::BeginLayer(BackgroundLayer);
+    DrawRectangleGradientEx(PresentationManager::GetCurrentLayerRect(), BLACK, BLACK, Color(0, 0, 40, 255), Color(40,40,40,255));
+    PresentationManager::EndLayer();
 
+    PresentationManager::BeginLayer(PlayerLayer);
     EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
         {
             auto transform = player.GetEntityComponent<TransformComponent>();
@@ -26,11 +29,9 @@ void DrawTask::Tick()
                 DrawCircleV(transform->Position, player.Size, GREEN);
             }
         });
-
     PresentationManager::EndLayer();
 
     PresentationManager::BeginLayer(NPCLayer);
-
     double now = GetTime();
     EntitySystem::DoForEachComponent<NPCComponent>([&](NPCComponent& npc)
         {

@@ -8,6 +8,7 @@
 struct NPCComponent : public EntitySystem::EntityComponent
 {
     DECLARE_SIMPLE_COMPONENT(NPCComponent);
+
     float Size = 20;
     Color Tint = BLUE;
     double LastUpdateTime = 0;

@@ -13,27 +13,26 @@ InputTask::InputTask()
 
 void InputTask::Tick()
 {
-    Vector2 InputVector = { 0.0f, 0.0f };
+    Vector2 inputVector = { 0.0f, 0.0f };
 
     if (IsKeyDown(KEY_W))
-        InputVector.y -= 1.0f;
+        inputVector.y -= 1.0f;
     if (IsKeyDown(KEY_S))
-        InputVector.y += 1.0f;
+        inputVector.y += 1.0f;
     if (IsKeyDown(KEY_A))
-        InputVector.x -= 1.0f;
+        inputVector.x -= 1.0f;
     if (IsKeyDown(KEY_D))
-        InputVector.x += 1.0f;
+        inputVector.x += 1.0f;
 
     if (IsKeyPressed(KEY_SPACE))
         UseInterpolateNPCs = !UseInterpolateNPCs;
 
-    if (Vector2Length(InputVector) > 1.0f)
+    if (Vector2LengthSqr(inputVector) > 0.001f)
     {
-        InputVector = Vector2Normalize(InputVector);
+        inputVector = Vector2Normalize(inputVector);
     }
 
-    EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
-        {
-            player.Input = InputVector;
-        });
+    auto* player = EntitySystem::GetFirstComponentOfType<PlayerComponent>();
+    if (player)
+        player->Input = inputVector;
 }

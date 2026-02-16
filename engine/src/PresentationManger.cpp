@@ -137,6 +137,14 @@ namespace PresentationManager
         ActiveLayer = nullptr;
     }
 
+    Rectangle GetCurrentLayerRect()
+    {
+        if (!ActiveLayer)
+            return Rectangle(0, 0, float(GetScreenWidth()), float(GetScreenHeight()));
+
+        return Rectangle(0, 0, float(ActiveLayer->Framebuffer.texture.width), float(ActiveLayer->Framebuffer.texture.height));
+    }
+
     void SetLayerAlpha(size_t layer, float alpha)
     {
         auto itr = LayerIdToIndex.find(layer);

@@ -19,6 +19,7 @@
 #include "tasks/Input.h"
 #include "tasks/Draw.h"
 #include "tasks/Overlay.h"
+#include "tasks/GUI.h"
 
 #include <atomic>
 
@@ -37,7 +38,7 @@ size_t DebugLayer = 200;
 
 double LastFrameTime = 0;
 
-ValueTracker FameTimeTracker(144, "FrameTime");
+ValueTracker FameTimeTracker(300, "FrameTime");
 
 std::atomic<BoundingBox2D> WorldBounds;
 
@@ -76,6 +77,7 @@ void GameInit()
     TaskManager::AddTask<InputTask>();
     TaskManager::AddTask<DrawTask>(); 
     TaskManager::AddTask<OverlayTask>();
+    TaskManager::AddTask<GUITask>();
     TaskManager::AddTaskOnState<LambdaTask>(GameState::Present, Hashes::CRC64Str("Present"), []() { PresentationManager::Present(); }, true);
 
     EntitySystem::RegisterComponent<TransformComponent>();
@@ -105,16 +107,17 @@ void GameInit()
     PresentationManager::Init();
 
     // create the presentation layers
-   // BackgroundLayer = PresentationManager::DefineLayer(uint8_t(BackgroundLayer));
+    BackgroundLayer = PresentationManager::DefineLayer(uint8_t(BackgroundLayer), true, 0.1f);
     NPCLayer = PresentationManager::DefineLayer(uint8_t(NPCLayer));
     PlayerLayer = PresentationManager::DefineLayer(uint8_t(PlayerLayer));
-   // GUILayer = PresentationManager::DefineLayer(uint8_t(GUILayer));
+    GUILayer = PresentationManager::DefineLayer(uint8_t(GUILayer));
     DebugLayer = PresentationManager::DefineLayer(uint8_t(DebugLayer));
 }
 
 void GameCleanup()
 {
     TaskManager::Cleanup();
+    PresentationManager::Cleanup();
     CloseWindow();
 }
 

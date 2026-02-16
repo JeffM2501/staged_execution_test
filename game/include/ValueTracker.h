@@ -16,6 +16,8 @@ public:
     float Max = 0;
     float Min = 0;
     float ValueScale = 1000.0f;
+
+    float MaxClamp = 1.0f / 60.0f;
 public:
 
     ValueTracker(size_t maxValues, std::string_view name = "Value")
@@ -26,6 +28,9 @@ public:
 
     void AddValue(float value)
     {
+        if (value > MaxClamp)
+            value = MaxClamp;
+
         Values[NextValueIndex] = value;
         NextValueIndex++;
         if (NextValueIndex >= Values.size())
