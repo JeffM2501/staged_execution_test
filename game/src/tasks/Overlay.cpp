@@ -21,7 +21,7 @@ void OverlayTask::Tick()
     else
         DrawText("Interpolation: OFF (Press Space to toggle)", x, y, 20, RED);
 
-    Rectangle graphBounds = { float(x + 450), float(y + 3), 400, 50 };
+    Rectangle graphBounds = { float(x + 460), float(y + 3), 400, 60 };
     FameTimeTracker.DrawGraph(graphBounds);
 
 #if defined(DEBUG)

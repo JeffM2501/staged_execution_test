@@ -78,11 +78,12 @@ public:
 
         if (NextValueIndex > 0)
         {
-            const char* text = TextFormat("%s\nCurrent %0.3f%s\nMax %0.3f%s\nMin %0.3f%s", 
+            const char* text = TextFormat("%s\nCurrent %0.3f%s\nMax %0.3f%s\nMin %0.3f%s\nJitter %0.3f%s", 
                 Name.c_str(), 
                 Values[NextValueIndex - 1] * ValueScale, Suffix.c_str(),
                 Max * ValueScale, Suffix.c_str(),
-                Min * ValueScale, Suffix.c_str());
+                Min * ValueScale, Suffix.c_str(),
+                (Max - Min) * ValueScale, Suffix.c_str());
 
             DrawText(text, int(bounds.x + bounds.width + 2), int(bounds.y), 10, LIGHTGRAY);
 
