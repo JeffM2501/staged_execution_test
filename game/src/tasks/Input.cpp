@@ -5,12 +5,6 @@
 
 #include "components/PlayerComponent.h"
 
-InputTask::InputTask()
-{
-    DependsOnState = GameState::PreUpdate;
-    RunInMainThread = true;
-}
-
 void InputTask::Tick()
 {
     Vector2 inputVector = { 0.0f, 0.0f };

@@ -4,12 +4,6 @@
 #include "GameInfo.h"
 #include "PresentationManager.h"
 
-OverlayTask::OverlayTask()
-{
-    DependsOnState = GameState::Draw;
-    RunInMainThread = true;
-}
-
 void OverlayTask::Tick()
 {
     PresentationManager::BeginLayer(DebugLayer);
@@ -31,14 +25,14 @@ void OverlayTask::Tick()
 
 #if defined(DEBUG)
     y = 30;
-    for (GameState state = GameState::FrameHead; state <= GameState::FrameTail; ++state)
+    for (FrameStage stage = FrameStage::FrameHead; stage <= FrameStage::FrameTail; ++stage)
     {
-        auto& stats = TaskManager::GetStatsForState(state);
+        auto& stats = TaskManager::GetStatsForState(stage);
         if (stats.TaskCount == 0)
             continue;
 
         const char* text = TextFormat("%s %d Tasks in %0.3f ms [Max %0.3f] (Blocked for %0.3f ms [Max %0.3f])",
-            GetStateName(state),
+            GetStageName(stage),
             stats.TaskCount,
             stats.Durration * 1000.0,
             stats.MaxDurration * 1000.0,

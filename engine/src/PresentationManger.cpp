@@ -1,4 +1,5 @@
 #include "PresentationManager.h"
+#include "TaskManager.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -42,7 +43,7 @@ namespace PresentationManager
 
     void Init()
     {
-        // Initialize presentation manager resources
+        TaskManager::AddTaskOnState<LambdaTask>(FrameStage::Present, Hashes::CRC64Str("Present"), []() { PresentationManager::Present(); }, true);
     }
 
     void Update()

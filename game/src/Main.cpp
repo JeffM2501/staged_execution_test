@@ -1,7 +1,7 @@
 
 #include "raylib.h"
 #include "raymath.h"
-#include "GameState.h"
+#include "FrameStage.h"
 #include "Task.h"
 #include "TaskManager.h"
 #include "TimeUtils.h"
@@ -98,14 +98,14 @@ void RegisterTasks()
     TaskManager::AddTask<DrawTask>();
     TaskManager::AddTask<OverlayTask>();
     TaskManager::AddTask<GUITask>();
-    TaskManager::AddTaskOnState<LambdaTask>(GameState::Present, Hashes::CRC64Str("Present"), []() { PresentationManager::Present(); }, true);
+    
 }
 
 void RegisterComponents()
 {
     EntitySystem::RegisterComponent<TransformComponent>();
-    RegisterComponentWithUpdate<PlayerComponent>(GameState::Update, true);
-    RegisterComponentWithUpdate<NPCComponent>(GameState::FixedUpdate, true);
+    RegisterComponentWithUpdate<PlayerComponent>(FrameStage::Update, true);
+    RegisterComponentWithUpdate<NPCComponent>(FrameStage::FixedUpdate, true);
 }
 
 void RegisterLayers()

@@ -6,6 +6,7 @@
 #include <memory>
 #include <algorithm>
 #include <execution>
+#include <mutex>
 
 #define DECLARE_COMPONENT(CompoentName) \
 static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); }
@@ -32,6 +33,8 @@ namespace EntitySystem
         virtual void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false) = 0;
 
         virtual ~IComponentTable() = default;
+
+        std::recursive_mutex ItteratorLock;
     };
 
     template<class T>
@@ -44,6 +47,7 @@ namespace EntitySystem
 
         EntityComponent* Add(size_t id) override
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             Components.emplace_back(id);
             ComponentsByID[id] = Components.size() - 1;
             return &Components.back();
@@ -52,6 +56,7 @@ namespace EntitySystem
         template<class... Args>
         T* Add(size_t id, Args&&... args)
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             Components.emplace_back(id, std::forward<Args>(args)...);
             ComponentsByID[id] = Components.size() - 1;
             return &Components.back();
@@ -59,6 +64,8 @@ namespace EntitySystem
 
         void Remove(size_t id) override
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
+
             auto itr = ComponentsByID.find(id);
             if (itr == ComponentsByID.end())
                 return;
@@ -72,17 +79,20 @@ namespace EntitySystem
 
         void Clear() override
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             Components.clear();
             ComponentsByID.clear();
         }
 
         bool HasEntity(size_t id) override
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             return ComponentsByID.contains(id);
         }
         
         EntityComponent* Get(size_t id) override
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             auto itr = ComponentsByID.find(id);
             if (itr == ComponentsByID.end())
                 return Add(id);
@@ -92,6 +102,7 @@ namespace EntitySystem
 
         EntityComponent* TryGet(size_t id) override
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             auto itr = ComponentsByID.find(id);
             if (itr == ComponentsByID.end())
                 return nullptr;
@@ -101,6 +112,7 @@ namespace EntitySystem
 
         void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false) override
         {
+            std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             if (paralel)
             {
                 std::for_each(std::execution::par, Components.begin(), Components.end(), [func]
@@ -121,12 +133,15 @@ namespace EntitySystem
 
         void DoForEach(std::function<void(T&)> func, bool paralel = false)
         {
+            std::lock_guard<std::mutex> lock(ItteratorLock);
             DoForEach([&func](EntityComponent& component)
             {
                     func(static_cast<T&>(component));
             }, paralel);
         }
     };
+
+    void Init();
 
     void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel = false);
     void DoForEachComponent(size_t componentType, std::function<void(EntityComponent&)> func, bool paralel = false);
@@ -208,6 +223,8 @@ namespace EntitySystem
     void RemoveEntity(size_t entityId);
 
     void ClearAllEntities();
+
+    void FlushMorgue();
 
     struct EntityComponent
     {

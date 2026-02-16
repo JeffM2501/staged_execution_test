@@ -5,7 +5,6 @@
 #include "TaskManager.h"
 #include "GameInfo.h"
 
-
 bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const BoundingBox2D& bounds)
 {
     bool hit = false;
@@ -41,7 +40,6 @@ bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const Bou
     entity.Position = newPos;
     return hit;
 }
-
 
 void NPCComponent::Update()
 {

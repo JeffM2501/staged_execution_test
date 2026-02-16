@@ -3,11 +3,8 @@
 #include "PresentationManager.h"
 #include "GameInfo.h"
 
-GUITask::GUITask()
+GUITask::GUITask() : Task(FrameStage::PreDraw, true)
 {
-    DependsOnState = GameState::PreDraw;
-    RunInMainThread = true;
-
     Logo = LoadTexture("resources/logo.png");
 }
 

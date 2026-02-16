@@ -6,7 +6,7 @@ class DrawTask : public Task
 {
 public:
     DECLARE_TASK(DrawTask);
-    DrawTask();
+    DrawTask() :Task(FrameStage::Draw, true) {}
 
     void Tick() override;
 };

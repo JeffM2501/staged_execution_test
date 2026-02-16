@@ -68,10 +68,10 @@ namespace TaskManager
     }
 
     template<typename T, typename... Args>
-    T* AddTaskOnState(GameState dependentState, Args&&... args)
+    T* AddTaskOnState(FrameStage stage, Args&&... args)
     {
         auto task = std::make_unique<T>(std::forward<Args>(args)...);
-        task->DependsOnState = dependentState;
+        task->StartingStage = stage;
         T* taskPtr = task.get();
         Tasks.push_back(std::move(task));
         return taskPtr;
@@ -100,9 +100,9 @@ namespace TaskManager
         return nullptr;
     }
 
-    bool IsStateBlocked(GameState state);
+    bool IsStateBlocked(FrameStage state);
     void AdvanceThreadIndex();
-    void RunTasksForState(GameState state);
+    void RunTasksForState(FrameStage state);
     bool IsIdle();
     void AddTask(std::unique_ptr<Task> task);
     void AbortAll();
@@ -110,6 +110,6 @@ namespace TaskManager
     inline float GetFixedDeltaTime() { return 1.0f / FixedFPS; }
 
 #if defined(DEBUG)
-    GameStateStats& GetStatsForState(GameState state);
+    GameStateStats& GetStatsForState(FrameStage state);
 #endif 
 }

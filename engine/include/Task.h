@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GameState.h"
+#include "FrameStage.h"
 #include "CRC64.h"
 
 #include <vector>
@@ -19,9 +19,12 @@ protected:
 
     virtual void Tick() = 0;
 
-    GameState BlocksState = GameState::AutoNextState;
+    FrameStage BlocksStage = FrameStage::AutoNextState;
 public:
     virtual size_t TaskId() = 0;
+
+    Task() = default;
+    Task(FrameStage startStage, bool mainTherad) : StartingStage(startStage), RunInMainThread(mainTherad) {}
 
     void Execute();
 
@@ -51,9 +54,9 @@ public:
         return nullptr;
     }
 
-    GameState DependsOnState = GameState::FrameHead;
+    FrameStage StartingStage = FrameStage::FrameHead;
    
-    GameState GetBlocksState();
+    FrameStage GetBlocksStage();
 
     bool RunInMainThread = false;
 

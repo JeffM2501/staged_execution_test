@@ -67,9 +67,9 @@ namespace TaskManager
     std::vector<std::unique_ptr<ThreadInfo>> Threads;
 
 #if defined(DEBUG)
-    std::unordered_map<GameState, GameStateStats> StateStats;
+    std::unordered_map<FrameStage, GameStateStats> StateStats;
    
-    GameStateStats& GetStatsForState(GameState state)
+    GameStateStats& GetStatsForState(FrameStage state)
     {
         if (!StateStats.contains(state))
             StateStats[state] = GameStateStats();
@@ -114,34 +114,34 @@ namespace TaskManager
 
         Accumulator += GetDeltaTime();
 
-        for (GameState state = GameState::FrameHead; state <= GameState::FrameTail; ++state)
+        for (FrameStage state = FrameStage::FrameHead; state <= FrameStage::FrameTail; ++state)
         {
 #if defined(DEBUG)
             auto& stats = GetStatsForState(state);
             stats.TickedThisFrame = false;
 #endif
-            if (state == GameState::FixedUpdate)
+            if (state == FrameStage::FixedUpdate)
             {
                 while (Accumulator >= FixedUpdateTime)
                 {
-                    RunTasksForState(GameState::FixedUpdate);
+                    RunTasksForState(FrameStage::FixedUpdate);
                     Accumulator -= FixedUpdateTime;
                 }
             }
             else
             {
                 RunTasksForState(state);
-                if (state == GameState::Present)
+                if (state == FrameStage::Present)
                     EndDrawing();
             }
         }
     }
 
-    bool IsStateBlocked(GameState state)
+    bool IsStateBlocked(FrameStage state)
     {
         for (auto& task : Tasks)
         {
-            if (task->GetBlocksState() == state && !task->IsComplete())
+            if (task->GetBlocksStage() == state && !task->IsComplete())
             {
                 return true;
             }
@@ -156,7 +156,7 @@ namespace TaskManager
             NextThreadIndex = 0;
     }
 
-    void RunTasksForState(GameState state)
+    void RunTasksForState(FrameStage state)
     {
 #if defined(DEBUG)
         auto& stats = GetStatsForState(state);
@@ -185,7 +185,7 @@ namespace TaskManager
 
         for (auto& task : Tasks)
         {
-            if (task->DependsOnState == state && !task->RunInMainThread)
+            if (task->StartingStage == state && !task->RunInMainThread)
             {
                 Threads[NextThreadIndex]->AddTask(task.get());
                 AdvanceThreadIndex();
@@ -198,7 +198,7 @@ namespace TaskManager
 
         for (auto& task : Tasks)
         {
-            if (task->DependsOnState == state && task->RunInMainThread)
+            if (task->StartingStage == state && task->RunInMainThread)
             {
                 task->Execute();
 #if defined(DEBUG)

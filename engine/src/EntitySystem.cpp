@@ -1,12 +1,23 @@
 #include "EntitySystem.h"
+#include "TaskManager.h"
+#include "FrameStage.h"
 
 #include <memory>
 #include <unordered_map>
+#include <set>
 
 namespace EntitySystem
 {
+    std::recursive_mutex MorgueLock;
+
+    std::set<size_t> EntityMorgue;
     static std::unordered_map<size_t, std::unique_ptr<IComponentTable>> ComponentTables;
     size_t NextEntityId = 1;
+
+    void Init()
+    {
+        TaskManager::AddTaskOnState<LambdaTask>(FrameStage::FrameTail, Hashes::CRC64Str("FlushEntities"), []() { EntitySystem::FlushMorgue(); }, true);
+    }
 
     size_t NewEntityId()
     {
@@ -52,10 +63,8 @@ namespace EntitySystem
 
     void RemoveEntity(size_t entityId)
     {
-        for (auto& [componentType, table] : ComponentTables)
-        {
-            table->Remove(entityId);
-        }
+        std::lock_guard<std::recursive_mutex> lock(MorgueLock);
+        EntityMorgue.insert(entityId);
     }
 
     void ClearAllEntities()
@@ -64,6 +73,20 @@ namespace EntitySystem
         {
             table->Clear();
         }
+    }
+
+    void FlushMorgue()
+    {
+        std::lock_guard<std::recursive_mutex> lock(MorgueLock);
+        for (size_t entityId : EntityMorgue)
+        {
+            for (auto& [componentType, table] : ComponentTables)
+            {
+                table->Remove(entityId);
+            }
+        }
+
+        EntityMorgue.clear();
     }
 
     void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel)

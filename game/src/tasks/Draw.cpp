@@ -8,12 +8,6 @@
 #include "EntitySystem.h"
 #include "GameInfo.h"
 
-DrawTask::DrawTask()
-{
-    DependsOnState = GameState::Draw;
-    RunInMainThread = true;
-}
-
 void DrawTask::Tick()
 {
     PresentationManager::BeginLayer(BackgroundLayer);

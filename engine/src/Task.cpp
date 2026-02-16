@@ -17,10 +17,10 @@ bool Task::IsComplete()
     return Completed.load();
 }
 
-GameState Task::GetBlocksState()
+FrameStage Task::GetBlocksStage()
 {
-    if (BlocksState != GameState::AutoNextState)
-        return BlocksState;
+    if (BlocksStage != FrameStage::AutoNextState)
+        return BlocksStage;
 
-    return GetNextState(DependsOnState);
+    return GetNextStage(StartingStage);
 }

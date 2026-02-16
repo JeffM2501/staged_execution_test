@@ -2,10 +2,10 @@
 
 #include "EntitySystem.h"
 #include "TaskManager.h"
-#include "GameState.h"
+#include "FrameStage.h"
 
 template<class T>
-void RegisterComponentWithUpdate(GameState state, bool threadUpdate)
+void RegisterComponentWithUpdate(FrameStage state, bool threadUpdate)
 {
     EntitySystem::RegisterComponent<T>();
 
