@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <thread>
+#include <algorithm>
 
 class ThreadInfo
 {
