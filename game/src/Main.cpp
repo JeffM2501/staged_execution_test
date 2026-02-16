@@ -97,7 +97,6 @@ void RegisterTasks()
     TaskManager::AddTask<DrawTask>();
     TaskManager::AddTask<OverlayTask>();
     TaskManager::AddTask<GUITask>();
-    
 }
 
 void RegisterComponents()

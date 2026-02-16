@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+
 namespace PresentationManager
 {
     void Init();

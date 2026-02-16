@@ -156,6 +156,19 @@ namespace TaskManager
             NextThreadIndex = 0;
     }
 
+    size_t GetAvailableThread()
+    {
+        for (size_t i = 0; i < Threads.size(); i++)
+        {
+            if (Threads[i]->IsIdle())
+                return i;
+        }
+
+        // just pick one
+        AdvanceThreadIndex();
+        return NextThreadIndex;
+    }
+
     void RunTasksForState(FrameStage state)
     {
 #if defined(DEBUG)
@@ -187,9 +200,7 @@ namespace TaskManager
         {
             if (task->StartingStage == state && !task->RunInMainThread)
             {
-                Threads[NextThreadIndex]->AddTask(task.get());
-                AdvanceThreadIndex();
-
+                Threads[GetAvailableThread()]->AddTask(task.get());
 #if defined(DEBUG)
                 stats.TaskCount++;
 #endif
@@ -213,6 +224,21 @@ namespace TaskManager
         if (stats.Durration > stats.MaxDurration)
             stats.MaxDurration = stats.Durration;
 #endif
+    }
+
+    void RunOneShotTask(Task* task)
+    {
+        if (!task)
+            return;
+
+        if (task->RunInMainThread)
+        {
+            task->Execute();
+        }
+        else
+        {
+            Threads[GetAvailableThread()]->AddTask(task);
+        }
     }
 
     bool IsIdle()

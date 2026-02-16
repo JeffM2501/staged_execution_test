@@ -104,6 +104,9 @@ namespace TaskManager
     bool IsStateBlocked(FrameStage state);
     void AdvanceThreadIndex();
     void RunTasksForState(FrameStage state);
+
+    void RunOneShotTask(Task* task);
+
     bool IsIdle();
     void AddTask(std::unique_ptr<Task> task);
     void AbortAll();
