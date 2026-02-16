@@ -5,48 +5,60 @@
 
 #include <unordered_map>
 
-void ThreadInfo::CheckTasks()
+ThreadInfo::ThreadInfo() : Running(true)
 {
-    if (Running.load())
-        return;
-    if (Tasks.empty())
-        return;
-
-    if (Thread.joinable())
-        Thread.join();
-
     Thread = std::thread([this]()
         {
-            Running.store(true);
-            while (!Tasks.empty())
-            {
-                if (Abort.load())
-                {
-                    Tasks.clear();
-                    break;
-                }
-                Task* task = Tasks.front();
-                Tasks.pop_front();
-                task->Execute();
-                if (OnTaskComplete)
-                    OnTaskComplete(task);
-            }
-            Running.store(false);
-
-            if (OnThreadIdle)
-                OnThreadIdle(ThreadId);
+            Run();
         });
+}
+
+ThreadInfo::~ThreadInfo()
+{
+    AbortTasks();
+}
+
+void ThreadInfo::Run()
+{
+    while (true)
+    {
+        std::unique_lock<std::mutex> lock(Lock);
+        Trigger.wait(lock, [this]() { return !Running || !Tasks.empty(); });
+        if (!Running && Tasks.empty())
+            break;
+
+        if (Abort.load())
+        {
+            Tasks.clear();
+            break;
+        }
+
+        Task* task = Tasks.front();
+        Tasks.pop_front();
+        task->Execute();
+        if (OnTaskComplete)
+            OnTaskComplete(task);
+    }
+    if (OnThreadAbort)
+        OnThreadAbort(ThreadId);
 }
 
 void ThreadInfo::AbortTasks()
 {
-    Abort.store(true);
+    {
+        std::lock_guard<std::mutex> lock(Lock);
+        Running.store(false);
+        Abort.store(true);
+    }
+    Trigger.notify_one();
+
     if (Thread.joinable())
         Thread.join();
 }
 
 bool ThreadInfo::IsIdle()
 {
+    std::lock_guard<std::mutex> lock(Lock);
     for (auto& task : Tasks)
     {
         if (!task->IsComplete())
@@ -57,8 +69,11 @@ bool ThreadInfo::IsIdle()
 
 void ThreadInfo::AddTask(Task* task)
 {
-    Tasks.push_back(task);
-    CheckTasks();
+    {
+        std::lock_guard<std::mutex> lock(Lock);
+        Tasks.push_back(task);
+    }
+    Trigger.notify_one();
 }
 
 namespace TaskManager
@@ -89,10 +104,6 @@ namespace TaskManager
         {
             auto threadInfo = std::make_unique<ThreadInfo>();
             threadInfo->ThreadId = i;
-            threadInfo->OnThreadIdle = [](size_t threadId)
-                {
-                    // handle idle thread
-                };
             Threads.push_back(std::move(threadInfo));
         }
     }

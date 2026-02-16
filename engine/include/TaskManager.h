@@ -7,22 +7,30 @@
 #include <functional>
 #include <thread>
 #include <algorithm>
+#include <mutex>
+#include <condition_variable>
 
 class ThreadInfo
 {
 private:
     std::atomic<bool> Running = false;
     std::atomic<bool> Abort = false;
+
+    void Run();
+
 public:
     size_t ThreadId = 0;
     std::thread Thread;
     std::deque<Task*> Tasks;
+    std::condition_variable Trigger;
+    std::mutex  Lock;
 
     std::function<void(Task*)> OnTaskComplete;
 
-    std::function<void(size_t)> OnThreadIdle;
+    std::function<void(size_t)> OnThreadAbort;
 
-    void CheckTasks();
+    ThreadInfo();
+    ~ThreadInfo();
 
     void AbortTasks();
 

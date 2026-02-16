@@ -162,17 +162,14 @@ int main()
             WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
 
         PresentationManager::Update();
-
         ClearBackground(ClearColor.load());
 
         FrameStartTime.store(GetTime());
-
         TaskManager::TickFrame();
-
         LastFrameTime = GetTime() - FrameStartTime;
-
         FameTimeTracker.AddValue(float(LastFrameTime));
 
+        // TODO, move this into a UI state manager?
         if (WindowShouldClose())
             IsRunning.store(false);
     }

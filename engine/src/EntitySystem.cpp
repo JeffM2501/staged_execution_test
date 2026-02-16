@@ -14,6 +14,14 @@ namespace EntitySystem
     static std::unordered_map<size_t, std::unique_ptr<IComponentTable>> ComponentTables;
     size_t NextEntityId = 1;
 
+    struct EntityInfo
+    {
+        bool Awake = false;
+        bool Enabled = false;
+    };
+
+    static std::unordered_map<size_t, EntityInfo> EntityInfoCache;
+
     void Init()
     {
         TaskManager::AddTaskOnState<LambdaTask>(FrameStage::FrameTail, Hashes::CRC64Str("FlushEntities"), []() { EntitySystem::FlushMorgue(); }, true);
@@ -55,6 +63,9 @@ namespace EntitySystem
 
     EntityComponent* AddComponent(size_t entityId, size_t componentType)
     {
+        if (!EntityInfoCache.contains(entityId))
+            EntityInfoCache.insert_or_assign(entityId, EntityInfo());
+
         auto itr = ComponentTables.find(componentType);
         if (itr == ComponentTables.end())
             return nullptr;
