@@ -8,6 +8,7 @@
 #include "PresentationManager.h"
 #include "EntitySystem.h"
 #include "ValueTracker.h"
+#include "ComponentTasks.h"
 
 #include <atomic>
 
@@ -40,12 +41,50 @@ float GetDeltaTime()
     return FPSDeltaTime.load();
 }
 
+
 struct TransformComponent : public EntitySystem::EntityComponent
 {
     Vector2 Position = Vector2Zeros;
     Vector2 Velocity = Vector2Zeros;
     DECLARE_SIMPLE_COMPONENT(TransformComponent);
 };
+
+
+bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const BoundingBox2D& bounds)
+{
+    bool hit = false;
+
+    Vector2 newPos = entity.Position + delta;
+
+    if (newPos.x > bounds.Max.x - size)
+    {
+        newPos.x = bounds.Max.x - size;
+        entity.Velocity.x *= -1;
+        hit = true;
+    }
+    else if (newPos.x < bounds.Min.x + size)
+    {
+        newPos.x = bounds.Min.x + size;
+        entity.Velocity.x *= -1;
+        hit = true;
+    }
+
+    if (newPos.y > bounds.Max.y - size)
+    {
+        newPos.y = bounds.Max.y - size;
+        entity.Velocity.y *= -1;
+        hit = true;
+    }
+    else if (newPos.y < bounds.Min.y + size)
+    {
+        newPos.y = bounds.Min.y + size;
+        entity.Velocity.y *= -1;
+        hit = true;
+    }
+
+    entity.Position = newPos;
+    return hit;
+}
 
 struct PlayerComponent : public EntitySystem::EntityComponent
 {
@@ -55,6 +94,17 @@ struct PlayerComponent : public EntitySystem::EntityComponent
 
     float Size = 10;
     float Health = 100;
+
+    float PlayerSpeed = 100.0f;
+
+    void Update()
+    {
+        auto transform = GetEntityComponent<TransformComponent>();
+        if (transform)
+        {
+            transform->Position += Input * PlayerSpeed * GetDeltaTime();
+        }
+    }
 };
 
 struct NPCComponent : public EntitySystem::EntityComponent
@@ -63,6 +113,17 @@ struct NPCComponent : public EntitySystem::EntityComponent
     float Size = 20;
     Color Tint = BLUE;
     double LastUpdateTime = 0;
+
+    void Update()
+    {
+        auto transform = GetEntityComponent<TransformComponent>();
+        if (transform)
+        {
+            float delta = TaskManager::GetFixedDeltaTime();
+            MoveEntity(*transform, Size, transform->Velocity * delta, WorldBounds.load());
+            LastUpdateTime = GetFrameStartTime();
+        }
+    }
 };
 
 class InputTask : public Task
@@ -103,94 +164,6 @@ protected:
             {
                 player.Input = InputVector;
             });
-    }
-};
-
-class PlayerMovementTask : public Task
-{
-public:
-    DECLARE_TASK(PlayerMovementTask);
-    PlayerMovementTask(InputTask* input)
-        : Input(input)
-    {
-        DependsOnState = GameState::Update;
-    }
-
-    float PlayerSpeed = 100.0f;
-    InputTask* Input = nullptr;
-protected:
-    void Tick() override
-    {
-        EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
-            {
-                auto transform = player.GetEntityComponent<TransformComponent>();
-                if (transform)
-                {
-                    transform->Position += player.Input * PlayerSpeed * GetDeltaTime();
-                }
-            });
-    }
-};
-
-bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const BoundingBox2D & bounds)
-{
-    bool hit = false;
-
-    Vector2 newPos = entity.Position + delta;
-
-    if (newPos.x > bounds.Max.x - size)
-    {
-        newPos.x = bounds.Max.x - size;
-        entity.Velocity.x *= -1;
-        hit = true;
-    }
-    else if (newPos.x < bounds.Min.x + size)
-    {
-        newPos.x = bounds.Min.x + size;
-        entity.Velocity.x *= -1;
-        hit = true;
-    }
-
-    if (newPos.y > bounds.Max.y - size)
-    {
-        newPos.y = bounds.Max.y - size;
-        entity.Velocity.y *= -1;
-        hit = true;
-    }
-    else if (newPos.y < bounds.Min.y + size)
-    {
-        newPos.y = bounds.Min.y + size;
-        entity.Velocity.y *= -1;
-        hit = true;
-    }
-
-    entity.Position = newPos;
-    return hit;
-}
-
-class AIUpdateTask : public Task
-{
-public:
-    DECLARE_TASK(AIUpdateTask);
-    AIUpdateTask()
-    {
-        DependsOnState = GameState::FixedUpdate;
-    }
-protected:
-    void Tick() override
-    {
-        double updateTime = GetTime();
-        EntitySystem::DoForEachComponent<NPCComponent>([&](NPCComponent& npc)
-            {
-                auto transform = npc.GetEntityComponent<TransformComponent>();
-                if (transform)
-                {
-                    float delta = TaskManager::GetFixedDeltaTime();
-                    MoveEntity(*transform, npc.Size, transform->Velocity * delta, WorldBounds.load());
-                    npc.LastUpdateTime = updateTime;
-                }
-            }, 
-            true);
     }
 };
 
@@ -337,21 +310,20 @@ void GameInit()
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
     FPSDeltaTime = 1.0f / float(GetMonitorRefreshRate(0));
 
-    auto inputTask = TaskManager::AddTask<InputTask>();
-    TaskManager::AddTask<PlayerMovementTask>(inputTask);
-    TaskManager::AddTask<AIUpdateTask>();
+    TaskManager::AddTask<InputTask>();
     TaskManager::AddTask<DrawTask>(); 
     TaskManager::AddTask<OverlayTask>();
     TaskManager::AddTask<PresentTask>();
 
     EntitySystem::RegisterComponent<TransformComponent>();
-    EntitySystem::RegisterComponent<PlayerComponent>();
-    EntitySystem::RegisterComponent<NPCComponent>();
+    RegisterComponentWithUpdate<PlayerComponent>(GameState::Update, true);
+    RegisterComponentWithUpdate<NPCComponent>(GameState::FixedUpdate, true);
 
     auto player = EntitySystem::AddComponent<PlayerComponent>(EntitySystem::NewEntityId());
     player->AddComponent<TransformComponent>()->Position = Vector2(100, 200);
     player->Size = 10;
     player->Health = 100;
+    player->PlayerSpeed = 200;
 
     constexpr float nonPlayerSize = 20;
     constexpr float nonPlayerSpeed = 50;
@@ -381,6 +353,12 @@ void GameCleanup()
     CloseWindow();
 }
 
+std::atomic<double> FrameStartTime = 0;
+double GetFrameStartTime()
+{
+    return FrameStartTime.load();
+}
+
 int main()
 {
     GameInit();
@@ -398,11 +376,11 @@ int main()
 
         ClearBackground(ClearColor.load());
 
-        double frameStartTime = GetTime();
+        FrameStartTime.store(GetTime());
 
         TaskManager::TickFrame();
 
-        LastFrameTime = GetTime() - frameStartTime;
+        LastFrameTime = GetTime() - FrameStartTime;
 
         FameTimeTracker.AddValue(float(LastFrameTime));
 

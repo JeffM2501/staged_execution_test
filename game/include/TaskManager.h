@@ -67,6 +67,16 @@ namespace TaskManager
         return taskPtr;
     }
 
+    template<typename T, typename... Args>
+    T* AddTaskOnState(GameState dependentState, Args&&... args)
+    {
+        auto task = std::make_unique<T>(std::forward<Args>(args)...);
+        task->DependsOnState = dependentState;
+        T* taskPtr = task.get();
+        Tasks.push_back(std::move(task));
+        return taskPtr;
+    }
+
     template<typename T>
     void RemoveTask()
     {

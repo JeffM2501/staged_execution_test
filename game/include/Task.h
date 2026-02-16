@@ -6,7 +6,7 @@
 #include <vector>
 #include <atomic>
 #include <memory>
-
+#include <functional>
 
 #define DECLARE_TASK(TaskName) \
  size_t TaskId() override { return Hashes::CRC64Str(#TaskName); } \
@@ -59,6 +59,23 @@ public:
 
     std::vector<std::unique_ptr<Task>> Dependencies;
     std::atomic<bool> TickedThisFrame = false;
+};
+
+class LambdaTask : public Task
+{
+private:
+    size_t TaskHash = 0;
+    std::function<void()> TickFunction;
+
+protected:
+    void Tick()
+    {
+        if (TickFunction)
+            TickFunction();
+    }
+public:
+    LambdaTask(size_t taskHash, std::function<void()> tick) : TaskHash(taskHash), TickFunction(tick) {}
+    size_t TaskId() override { return TaskHash; }
 };
 
 
