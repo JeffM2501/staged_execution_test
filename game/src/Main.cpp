@@ -23,6 +23,7 @@
 
 #include <atomic>
 
+// global stuff
 bool UseInterpolateNPCs = true;
 
 std::atomic<bool> IsRunning = true;
@@ -47,6 +48,7 @@ float GetDeltaTime()
     return FPSDeltaTime.load();
 }
 
+// world generation
 Vector2 GetRandomPosInBounds(const BoundingBox2D & bounds, float size)
 {
     float x = float(GetRandomValue(int(bounds.Min.x + size), int(bounds.Max.x - size)));
@@ -64,25 +66,9 @@ Vector2 GetRandomVector(float scaler = 1)
     return Vector2Normalize(Vector2(x, y)) * scaler;
 }
 
-void GameInit()
+void SetupScene()
 {
-    TaskManager::Init();
-
-    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(1280, 800, "Task Test");
-    SetTargetFPS(GetMonitorRefreshRate(0));
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
-    FPSDeltaTime = 1.0f / float(GetMonitorRefreshRate(0));
-
-    TaskManager::AddTask<InputTask>();
-    TaskManager::AddTask<DrawTask>(); 
-    TaskManager::AddTask<OverlayTask>();
-    TaskManager::AddTask<GUITask>();
-    TaskManager::AddTaskOnState<LambdaTask>(GameState::Present, Hashes::CRC64Str("Present"), []() { PresentationManager::Present(); }, true);
-
-    EntitySystem::RegisterComponent<TransformComponent>();
-    RegisterComponentWithUpdate<PlayerComponent>(GameState::Update, true);
-    RegisterComponentWithUpdate<NPCComponent>(GameState::FixedUpdate, true);
 
     auto player = EntitySystem::AddComponent<PlayerComponent>(EntitySystem::NewEntityId());
     player->AddComponent<TransformComponent>()->Position = Vector2(100, 200);
@@ -101,12 +87,31 @@ void GameInit()
         npc->Tint = GetRandomValue(0, 10) >= 5 ? DARKBLUE : DARKPURPLE;
         auto transform = npc->AddComponent<TransformComponent>();
         transform->Position = GetRandomPosInBounds(WorldBounds, nonPlayerSize);
-        transform->Velocity = GetRandomVector(float(GetRandomValue(int(nonPlayerSpeed/2), int(nonPlayerSpeed))));
+        transform->Velocity = GetRandomVector(float(GetRandomValue(int(nonPlayerSpeed / 2), int(nonPlayerSpeed))));
     }
+}
 
+// setup
+void RegisterTasks()
+{
+    TaskManager::AddTask<InputTask>();
+    TaskManager::AddTask<DrawTask>();
+    TaskManager::AddTask<OverlayTask>();
+    TaskManager::AddTask<GUITask>();
+    TaskManager::AddTaskOnState<LambdaTask>(GameState::Present, Hashes::CRC64Str("Present"), []() { PresentationManager::Present(); }, true);
+}
+
+void RegisterComponents()
+{
+    EntitySystem::RegisterComponent<TransformComponent>();
+    RegisterComponentWithUpdate<PlayerComponent>(GameState::Update, true);
+    RegisterComponentWithUpdate<NPCComponent>(GameState::FixedUpdate, true);
+}
+
+void RegisterLayers()
+{
     PresentationManager::Init();
 
-    // create the presentation layers
     BackgroundLayer = PresentationManager::DefineLayer(uint8_t(BackgroundLayer), true, 0.1f);
     NPCLayer = PresentationManager::DefineLayer(uint8_t(NPCLayer));
     PlayerLayer = PresentationManager::DefineLayer(uint8_t(PlayerLayer));
@@ -114,8 +119,26 @@ void GameInit()
     DebugLayer = PresentationManager::DefineLayer(uint8_t(DebugLayer));
 }
 
+void GameInit()
+{
+    TaskManager::Init();
+
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
+    InitWindow(1280, 800, "Task Test");
+    SetTargetFPS(GetMonitorRefreshRate(0));
+   
+    FPSDeltaTime = 1.0f / float(GetMonitorRefreshRate(0));
+
+    RegisterLayers();
+
+    RegisterTasks();
+    RegisterComponents();
+    SetupScene();
+}
+
 void GameCleanup()
 {
+    EntitySystem::ClearAllEntities();
     TaskManager::Cleanup();
     PresentationManager::Cleanup();
     CloseWindow();
