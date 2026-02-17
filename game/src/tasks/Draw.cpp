@@ -31,6 +31,7 @@ void DrawTask::Tick()
             if (transform)
             {
                 DrawCircleV(transform->Position, bullet.Size, bullet.Tint);
+                DrawText(TextFormat("%0.2f", bullet.Lifetime), transform->Position.x, transform->Position.y - bullet.Size - 10, 10, GRAY);
             }
         });
     PresentationManager::EndLayer();
