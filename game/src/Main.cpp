@@ -75,6 +75,8 @@ void SetupScene()
     player->Health = 100;
     player->PlayerSpeed = 200;
 
+    EntitySystem::AwakeEntity(player->EntityID);
+
     constexpr float nonPlayerSize = 20;
     constexpr float nonPlayerSpeed = 50;
     constexpr size_t npcCount = 200;
@@ -87,6 +89,9 @@ void SetupScene()
         auto transform = npc->AddComponent<TransformComponent>();
         transform->Position = GetRandomPosInBounds(WorldBounds, nonPlayerSize);
         transform->Velocity = GetRandomVector(float(GetRandomValue(int(nonPlayerSpeed / 2), int(nonPlayerSpeed))));
+
+        if (i < npcCount-5)
+            EntitySystem::AwakeEntity(transform->EntityID);
     }
 }
 

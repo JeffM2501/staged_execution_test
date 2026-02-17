@@ -18,6 +18,43 @@ CompoentName(size_t entityId) : EntityComponent(entityId) {}
 namespace EntitySystem
 {
     struct EntityComponent;
+
+    EntityComponent* AddComponent(size_t entityId, size_t componentType);
+    EntityComponent* GetEntityComponent(size_t entityId, size_t componentType);
+
+    bool IsEntityReady(size_t entityId);
+    bool IsEntityEnabled(size_t entityId);
+
+    void EnableEntity(size_t entityId, bool enabled);
+    void AwakeEntity(size_t entityId);
+
+    struct EntityComponent
+    {
+        size_t EntityID = 0;
+
+        EntityComponent(size_t entityId)
+            : EntityID(entityId)
+        {
+        }
+
+        template<class T>
+        T* AddComponent()
+        {
+            return static_cast<T*>(EntitySystem::AddComponent(EntityID, T::GetComponentId()));
+        }
+
+        template<class T>
+        T* GetEntityComponent()
+        {
+            return static_cast<T*>(EntitySystem::GetEntityComponent(EntityID, T::GetComponentId()));
+        }
+
+        template<class T>
+        bool EntityHasComponent()
+        {
+            return static_cast<T*>(EntitySystem::GetEntityComponent(EntityID, T::GetComponentId()));
+        }
+    };
    
     struct IComponentTable
     {
@@ -30,7 +67,7 @@ namespace EntitySystem
 
         virtual size_t GetComponentType() const = 0;
 
-        virtual void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false) = 0;
+        virtual void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false, bool enabledOnly = true) = 0;
 
         virtual ~IComponentTable() = default;
 
@@ -110,52 +147,52 @@ namespace EntitySystem
             return &Components[itr->second];
         }
 
-        void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false) override
+        void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false, bool enabledOnly = true) override
         {
             std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             if (paralel)
             {
-                std::for_each(std::execution::par, Components.begin(), Components.end(), [func]
+                std::for_each(std::execution::par, Components.begin(), Components.end(), [func, enabledOnly]
                 (auto& component)
                     {
-                        func(component);
+                        if (!enabledOnly || IsEntityEnabled(component.EntityID))
+                            func(component);
                     });
             }
             else
             {
-                std::for_each(Components.begin(), Components.end(), [func]
+                std::for_each(Components.begin(), Components.end(), [func, enabledOnly]
                 (auto& component)
                     {
-                        func(component);
+                        if (!enabledOnly || IsEntityEnabled(component.EntityID))
+                            func(component);
                     });
             }
         }
 
-        void DoForEach(std::function<void(T&)> func, bool paralel = false)
+        void DoForEach(std::function<void(T&)> func, bool paralel = false, bool enabledOnly = true)
         {
             std::lock_guard<std::mutex> lock(ItteratorLock);
-            DoForEach([&func](EntityComponent& component)
+            DoForEach([func, enabledOnly](EntityComponent& component)
             {
-                    func(static_cast<T&>(component));
-            }, paralel);
+                func(static_cast<T&>(component));
+            }, paralel, enabledOnly);
         }
     };
 
     void Init();
 
-    void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel = false);
-    void DoForEachComponent(size_t componentType, std::function<void(EntityComponent&)> func, bool paralel = false);
+    void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel = false, bool enabledOnly = true);
+    void DoForEachComponent(size_t componentType, std::function<void(EntityComponent&)> func, bool paralel = false, bool enabledOnly = true);
     
     template<class T>
-    void DoForEachComponent(std::function<void(T&)> func, bool paralel = false)
+    void DoForEachComponent(std::function<void(T&)> func, bool paralel = false, bool enabledOnly = true)
     {
         DoForEachComponent(T::GetComponentId(), [&func](EntityComponent& component)
         {
                 func(static_cast<T&>(component));
-        }, paralel);
+        }, paralel, enabledOnly);
     }
-
-    EntityComponent* GetEntityComponent(size_t entityId, size_t componentType);
 
     bool EntityHasComponent(size_t entityId, size_t componentType);
 
@@ -201,8 +238,6 @@ namespace EntitySystem
         return &table->Components.front();
     }
 
-    EntityComponent* AddComponent(size_t entityId, size_t componentType);
-
     template<class T, class... Args>
     T* AddComponent(size_t entityId, Args&&... args)
     {
@@ -220,37 +255,11 @@ namespace EntitySystem
         return static_cast<T*>(AddComponent(entityId, T::GetComponentId()));
     }
 
+    void AwakeAllEntities();
+
     void RemoveEntity(size_t entityId);
 
     void ClearAllEntities();
 
     void FlushMorgue();
-
-    struct EntityComponent
-    {
-        size_t EntityID = 0;
-
-        EntityComponent(size_t entityId)
-            : EntityID(entityId)
-        {
-        }
-
-        template<class T>
-        T* AddComponent()
-        {
-            return static_cast<T*>(EntitySystem::AddComponent(EntityID, T::GetComponentId()));
-        }
-
-        template<class T>
-        T* GetEntityComponent()
-        {
-            return static_cast<T*>(EntitySystem::GetEntityComponent(EntityID, T::GetComponentId()));
-        }
-
-        template<class T>
-        bool EntityHasComponent()
-        {
-            return static_cast<T*>(EntitySystem::GetEntityComponent(EntityID, T::GetComponentId()));
-        }
-    };
 }

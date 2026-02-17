@@ -21,6 +21,9 @@ void InputTask::Tick()
     if (IsKeyPressed(KEY_SPACE))
         UseInterpolateNPCs = !UseInterpolateNPCs;
 
+    if (IsKeyPressed(KEY_ENTER))
+        EntitySystem::AwakeAllEntities();
+
     if (Vector2LengthSqr(inputVector) > 0.001f)
     {
         inputVector = Vector2Normalize(inputVector);

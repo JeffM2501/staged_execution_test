@@ -17,9 +17,10 @@ namespace EntitySystem
     struct EntityInfo
     {
         bool Awake = false;
-        bool Enabled = false;
+        bool Enabled = true;
     };
 
+    std::recursive_mutex EntityInfoLock;
     static std::unordered_map<size_t, EntityInfo> EntityInfoCache;
 
     void Init()
@@ -78,29 +79,74 @@ namespace EntitySystem
         EntityMorgue.insert(entityId);
     }
 
+    void AwakeAllEntities()
+    {
+        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+        for (auto& [entity, info] : EntityInfoCache)
+        {
+            info.Awake = true;
+        }
+    }
+
+    bool IsEntityReady(size_t entityId)
+    {
+        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+        auto itr = EntityInfoCache.find(entityId);
+        return itr != EntityInfoCache.end() && itr->second.Awake;
+    }
+
+    bool IsEntityEnabled(size_t entityId)
+    {
+        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+        auto itr = EntityInfoCache.find(entityId);
+        return itr != EntityInfoCache.end() && itr->second.Awake && itr->second.Enabled;
+    }
+
+    void EnableEntity(size_t entityId, bool enabled)
+    {
+        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+        auto itr = EntityInfoCache.find(entityId);
+        if (itr != EntityInfoCache.end())
+            itr->second.Enabled = enabled;
+    }
+
+    void AwakeEntity(size_t entityId)
+    {
+        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+        auto itr = EntityInfoCache.find(entityId);
+        if (itr != EntityInfoCache.end())
+            itr->second.Awake = true;
+    }
+
     void ClearAllEntities()
     {
         for (auto& [componentType, table] : ComponentTables)
         {
             table->Clear();
         }
+        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+        EntityInfoCache.clear();
     }
 
     void FlushMorgue()
     {
         std::lock_guard<std::recursive_mutex> lock(MorgueLock);
+        std::lock_guard<std::recursive_mutex> infoLock(EntityInfoLock);
         for (size_t entityId : EntityMorgue)
         {
             for (auto& [componentType, table] : ComponentTables)
             {
                 table->Remove(entityId);
             }
+
+            EntityInfoCache.erase(entityId);
         }
 
         EntityMorgue.clear();
+
     }
 
-    void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel)
+    void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel, bool enabledOnly)
     {
         auto itr = ComponentTables.find(componentType);
         if (itr == ComponentTables.end() || !func)
@@ -109,10 +155,10 @@ namespace EntitySystem
         itr->second->DoForEach([&func](EntityComponent& component)
             {
                 func(component.EntityID);
-            }, paralel);
+            }, paralel, enabledOnly);
     }
 
-    void DoForEachComponent(size_t componentType, std::function<void(EntityComponent&)> func, bool paralel)
+    void DoForEachComponent(size_t componentType, std::function<void(EntityComponent&)> func, bool paralel, bool enabledOnly)
     {
         auto itr = ComponentTables.find(componentType);
         if (itr == ComponentTables.end() || !func)
@@ -121,6 +167,6 @@ namespace EntitySystem
         itr->second->DoForEach([&func](EntityComponent& component)
             {
                 func(component);
-            }, paralel);
+            }, paralel, enabledOnly);
     }
 }
