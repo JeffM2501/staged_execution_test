@@ -28,7 +28,7 @@ void OverlayTask::Tick()
     y = 30;
     for (FrameStage stage = FrameStage::FrameHead; stage <= FrameStage::FrameTail; ++stage)
     {
-        auto& stats = TaskManager::GetStatsForState(stage);
+        auto& stats = TaskManager::GetStatsForStage(stage);
         if (stats.TaskCount == 0)
             continue;
 

@@ -81,18 +81,19 @@ namespace TaskManager
     std::vector<std::unique_ptr<Task>> Tasks;
     std::vector<std::unique_ptr<ThreadInfo>> Threads;
 
+    // caches by stage
     std::unordered_map<FrameStage, std::vector<Task*>> TasksPerStartStage;
     std::unordered_map<FrameStage, std::vector<Task*>> TasksBlockingStages;
 
 #if defined(DEBUG)
-    std::unordered_map<FrameStage, GameStateStats> StateStats;
+    std::unordered_map<FrameStage, FrameStageStats> StageStats;
    
-    GameStateStats& GetStatsForState(FrameStage state)
+    FrameStageStats& GetStatsForStage(FrameStage stage)
     {
-        if (!StateStats.contains(state))
-            StateStats[state] = GameStateStats();
+        if (!StageStats.contains(stage))
+            StageStats[stage] = FrameStageStats();
 
-        return StateStats[state];
+        return StageStats[stage];
     }
 #endif 
 
@@ -131,35 +132,35 @@ namespace TaskManager
 
         Accumulator += GetDeltaTime();
 
-        for (FrameStage state = FrameStage::FrameHead; state <= FrameStage::FrameTail; ++state)
+        for (FrameStage stage = FrameStage::FrameHead; stage <= FrameStage::FrameTail; ++stage)
         {
 #if defined(DEBUG)
-            auto& stats = GetStatsForState(state);
+            auto& stats = GetStatsForStage(stage);
             stats.TickedThisFrame = false;
 #endif
-            if (state == FrameStage::FixedUpdate)
+            if (stage == FrameStage::FixedUpdate)
             {
                 while (Accumulator >= FixedUpdateTime)
                 {
-                    RunTasksForState(FrameStage::FixedUpdate);
+                    RunTasksForStage(FrameStage::FixedUpdate);
                     Accumulator -= FixedUpdateTime;
                 }
             }
             else
             {
-                RunTasksForState(state);
-                if (state == FrameStage::Present)
+                RunTasksForStage(stage);
+                if (stage == FrameStage::Present)
                     EndDrawing();
             }
         }
     }
 
-    bool IsStateBlocked(FrameStage state)
+    bool IsStageBlocked(FrameStage stage)
     {
-        if (!TasksBlockingStages.contains(state))
+        if (!TasksBlockingStages.contains(stage))
             return false;
 
-        for (auto& task : TasksBlockingStages[state])
+        for (auto& task : TasksBlockingStages[stage])
         {
             if (!task->IsComplete())
             {
@@ -189,10 +190,10 @@ namespace TaskManager
         return NextThreadIndex;
     }
 
-    void RunTasksForState(FrameStage state)
+    void RunTasksForStage(FrameStage stage)
     {
 #if defined(DEBUG)
-        auto& stats = GetStatsForState(state);
+        auto& stats = GetStatsForStage(stage);
         stats.TaskCount = 0;
         stats.BlockedDurration = 0;
         stats.Durration = 0;
@@ -200,7 +201,7 @@ namespace TaskManager
         stats.TickedThisFrame = true;
 #endif
         bool wasBlocked = false;
-        while (IsStateBlocked(state))
+        while (IsStageBlocked(stage))
         {
             wasBlocked = true;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -216,11 +217,11 @@ namespace TaskManager
 #endif
         }
 
-        if (TasksPerStartStage.contains(state))
+        if (TasksPerStartStage.contains(stage))
         {
-            for (auto task : TasksPerStartStage[state])
+            for (auto task : TasksPerStartStage[stage])
             {
-                // save off the blocking state
+                // save off the blocking stage
                 TasksBlockingStages[task->GetBlocksStage()].push_back(task);
 
                 if (task->RunInMainThread)
@@ -232,7 +233,7 @@ namespace TaskManager
 #endif
             }
 
-            for (auto task : TasksPerStartStage[state])
+            for (auto task : TasksPerStartStage[stage])
             {
                 if (!task->RunInMainThread)
                     continue;
@@ -278,7 +279,7 @@ namespace TaskManager
         return true;
     }
 
-    void CacheStateTask(Task* task)
+    void CacheStageTask(Task* task)
     {
         if (!TasksPerStartStage.contains(task->StartingStage))
         {

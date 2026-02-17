@@ -40,7 +40,7 @@ public:
 };
 
 #if defined(DEBUG)
-struct GameStateStats
+struct FrameStageStats
 {
     size_t TaskCount = 0;
     double StartTime = 0;
@@ -67,14 +67,14 @@ namespace TaskManager
 
     void TickFrame();
 
-    void CacheStateTask(Task* task);
+    void CacheStageTask(Task* task);
 
     template<typename T, typename... Args>
     T* AddTask(Args&&... args)
     {
         auto task = std::make_unique<T>(std::forward<Args>(args)...);
         T* taskPtr = task.get();
-        CacheStateTask(taskPtr);
+        CacheStageTask(taskPtr);
         Tasks.push_back(std::move(task));
         return taskPtr;
     }
@@ -85,7 +85,7 @@ namespace TaskManager
         auto task = std::make_unique<T>(std::forward<Args>(args)...);
         task->StartingStage = stage;
         T* taskPtr = task.get();
-        CacheStateTask(taskPtr);
+        CacheStageTask(taskPtr);
         Tasks.push_back(std::move(task));
         return taskPtr;
     }
@@ -113,9 +113,9 @@ namespace TaskManager
         return nullptr;
     }
 
-    bool IsStateBlocked(FrameStage state);
+    bool IsStageBlocked(FrameStage stage);
     void AdvanceThreadIndex();
-    void RunTasksForState(FrameStage state);
+    void RunTasksForStage(FrameStage state);
 
     void RunOneShotTask(Task* task);
 
@@ -126,6 +126,6 @@ namespace TaskManager
     inline float GetFixedDeltaTime() { return 1.0f / FixedFPS; }
 
 #if defined(DEBUG)
-    GameStateStats& GetStatsForState(FrameStage state);
+    FrameStageStats& GetStatsForStage(FrameStage state);
 #endif 
 }
