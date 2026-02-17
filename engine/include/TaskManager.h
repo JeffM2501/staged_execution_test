@@ -67,11 +67,14 @@ namespace TaskManager
 
     void TickFrame();
 
+    void CacheStateTask(Task* task);
+
     template<typename T, typename... Args>
     T* AddTask(Args&&... args)
     {
         auto task = std::make_unique<T>(std::forward<Args>(args)...);
         T* taskPtr = task.get();
+        CacheStateTask(taskPtr);
         Tasks.push_back(std::move(task));
         return taskPtr;
     }
@@ -82,6 +85,7 @@ namespace TaskManager
         auto task = std::make_unique<T>(std::forward<Args>(args)...);
         task->StartingStage = stage;
         T* taskPtr = task.get();
+        CacheStateTask(taskPtr);
         Tasks.push_back(std::move(task));
         return taskPtr;
     }
@@ -116,7 +120,7 @@ namespace TaskManager
     void RunOneShotTask(Task* task);
 
     bool IsIdle();
-    void AddTask(std::unique_ptr<Task> task);
+
     void AbortAll();
 
     inline float GetFixedDeltaTime() { return 1.0f / FixedFPS; }

@@ -81,6 +81,9 @@ namespace TaskManager
     std::vector<std::unique_ptr<Task>> Tasks;
     std::vector<std::unique_ptr<ThreadInfo>> Threads;
 
+    std::unordered_map<FrameStage, std::vector<Task*>> TasksPerStartStage;
+    std::unordered_map<FrameStage, std::vector<Task*>> TasksBlockingStages;
+
 #if defined(DEBUG)
     std::unordered_map<FrameStage, GameStateStats> StateStats;
    
@@ -123,6 +126,9 @@ namespace TaskManager
         for (auto& task : Tasks)
             task->TickedThisFrame.store(false);
 
+        for (auto& [stage, blockerList] : TasksBlockingStages)
+            blockerList.clear();
+
         Accumulator += GetDeltaTime();
 
         for (FrameStage state = FrameStage::FrameHead; state <= FrameStage::FrameTail; ++state)
@@ -150,9 +156,12 @@ namespace TaskManager
 
     bool IsStateBlocked(FrameStage state)
     {
-        for (auto& task : Tasks)
+        if (!TasksBlockingStages.contains(state))
+            return false;
+
+        for (auto& task : TasksBlockingStages[state])
         {
-            if (task->GetBlocksStage() == state && !task->IsComplete())
+            if (!task->IsComplete())
             {
                 return true;
             }
@@ -207,21 +216,27 @@ namespace TaskManager
 #endif
         }
 
-        for (auto& task : Tasks)
+        if (TasksPerStartStage.contains(state))
         {
-            if (task->StartingStage == state && !task->RunInMainThread)
+            for (auto task : TasksPerStartStage[state])
             {
-                Threads[GetAvailableThread()]->AddTask(task.get());
+                // save off the blocking state
+                TasksBlockingStages[task->GetBlocksStage()].push_back(task);
+
+                if (task->RunInMainThread)
+                    continue;
+
+                Threads[GetAvailableThread()]->AddTask(task);
 #if defined(DEBUG)
                 stats.TaskCount++;
 #endif
             }
-        }
 
-        for (auto& task : Tasks)
-        {
-            if (task->StartingStage == state && task->RunInMainThread)
+            for (auto task : TasksPerStartStage[state])
             {
+                if (!task->RunInMainThread)
+                    continue;
+
                 task->Execute();
 #if defined(DEBUG)
                 stats.TaskCount++;
@@ -263,9 +278,16 @@ namespace TaskManager
         return true;
     }
 
-    void AddTask(std::unique_ptr<Task> task)
+    void CacheStateTask(Task* task)
     {
-        Tasks.push_back(std::move(task));
+        if (!TasksPerStartStage.contains(task->StartingStage))
+        {
+            TasksPerStartStage.try_emplace(task->StartingStage);
+        }
+        TasksPerStartStage[task->StartingStage].push_back(task);
+
+        if (!TasksBlockingStages.contains(task->GetBlocksStage()))
+            TasksBlockingStages.try_emplace(task->GetBlocksStage());
     }
 
     void AbortAll()
