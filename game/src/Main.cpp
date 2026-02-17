@@ -14,6 +14,7 @@
 #include "components/TransformComponent.h"
 #include "components/PlayerComponent.h"
 #include "components/NPCComponent.h"
+#include "components/BulletComponent.h"
 
 #include "tasks/Input.h"
 #include "tasks/Draw.h"
@@ -109,6 +110,7 @@ void RegisterComponents()
     EntitySystem::RegisterComponent<TransformComponent>();
     RegisterComponentWithUpdate<PlayerComponent>(FrameStage::Update, true);
     RegisterComponentWithUpdate<NPCComponent>(FrameStage::FixedUpdate, true);
+    RegisterComponentWithUpdate<BulletComponent>(FrameStage::PreUpdate, true);
 }
 
 void RegisterLayers()
@@ -125,6 +127,7 @@ void RegisterLayers()
 void GameInit()
 {
     TaskManager::Init();
+    EntitySystem::Init();
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 800, "Task Test");

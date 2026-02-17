@@ -3,6 +3,7 @@
 #include "components/TransformComponent.h"
 #include "components/PlayerComponent.h"
 #include "components/NPCComponent.h"
+#include "components/BulletComponent.h"
 
 #include "PresentationManager.h"
 #include "EntitySystem.h"
@@ -15,12 +16,21 @@ void DrawTask::Tick()
     PresentationManager::EndLayer();
 
     PresentationManager::BeginLayer(PlayerLayer);
-    EntitySystem::DoForEachComponent<PlayerComponent>([&](PlayerComponent& player)
+    EntitySystem::DoForEachComponent<PlayerComponent>([&](auto& player)
         {
             auto transform = player.GetEntityComponent<TransformComponent>();
             if (transform)
             {
                 DrawCircleV(transform->Position, player.Size, GREEN);
+            }
+        });
+
+    EntitySystem::DoForEachComponent<BulletComponent>([&](auto& bullet)
+        {
+            auto transform = bullet.GetEntityComponent<TransformComponent>();
+            if (transform)
+            {
+                DrawCircleV(transform->Position, bullet.Size, bullet.Tint);
             }
         });
     PresentationManager::EndLayer();

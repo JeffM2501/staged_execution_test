@@ -108,9 +108,21 @@ namespace EntitySystem
                 return;
             size_t index = itr->second;
 
+            // it's the tail
+            if (index == Components.size() - 1)
+            {
+                Components.pop_back();
+                ComponentsByID.erase(itr);
+                return;
+            }
+
+            // it's in the middle, swap and erase
             std::swap(Components[index], Components.back());
             Components.pop_back();
-            ComponentsByID[Components[index].EntityID] = index;
+            if (!Components.empty())
+            {
+                ComponentsByID[Components[index].EntityID] = index;
+            }
             ComponentsByID.erase(itr);
         }
 

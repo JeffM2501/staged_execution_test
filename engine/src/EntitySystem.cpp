@@ -75,6 +75,8 @@ namespace EntitySystem
 
     void RemoveEntity(size_t entityId)
     {
+        EnableEntity(entityId, false);
+
         std::lock_guard<std::recursive_mutex> lock(MorgueLock);
         EntityMorgue.insert(entityId);
     }
@@ -143,7 +145,6 @@ namespace EntitySystem
         }
 
         EntityMorgue.clear();
-
     }
 
     void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel, bool enabledOnly)

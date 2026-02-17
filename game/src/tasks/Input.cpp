@@ -18,7 +18,7 @@ void InputTask::Tick()
     if (IsKeyDown(KEY_D))
         inputVector.x += 1.0f;
 
-    if (IsKeyPressed(KEY_SPACE))
+    if (IsKeyPressed(KEY_F2))
         UseInterpolateNPCs = !UseInterpolateNPCs;
 
     if (IsKeyPressed(KEY_ENTER))
@@ -31,5 +31,8 @@ void InputTask::Tick()
 
     auto* player = EntitySystem::GetFirstComponentOfType<PlayerComponent>();
     if (player)
+    {
         player->Input = inputVector;
+        player->ShootThisFrame = IsKeyDown(KEY_SPACE);
+    }
 }

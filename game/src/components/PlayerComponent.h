@@ -11,10 +11,16 @@ struct PlayerComponent : public EntitySystem::EntityComponent
 
     Vector2 Input = Vector2Zeros;
 
+    bool ShootThisFrame = false;
+
     float Size = 10;
     float Health = 100;
 
     float PlayerSpeed = 100.0f;
+
+    double LastShotTime = 0;
+
+    float ReloadTime = 0.5f;
 
     void Update();
 };
