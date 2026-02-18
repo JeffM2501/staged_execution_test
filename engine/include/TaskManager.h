@@ -24,6 +24,9 @@ public:
     std::deque<Task*> Tasks;
     std::condition_variable Trigger;
     std::mutex  Lock;
+    std::mutex  TaskLock;
+
+    std::atomic<bool> IsProcessing = false;
 
     std::function<void(Task*)> OnTaskComplete;
 

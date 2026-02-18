@@ -20,7 +20,9 @@ void PlayerComponent::Update()
                 auto bullet = EntitySystem::AddComponent<BulletComponent>(EntitySystem::NewEntityId());
                 auto bulletTransform = bullet->AddComponent<TransformComponent>();
                 bulletTransform->Position = transform->Position;
-                bulletTransform->Velocity = Vector2(PlayerSpeed*2, 0) + (Input * PlayerSpeed);
+
+                constexpr int spread = 50;
+                bulletTransform->Velocity = Vector2(PlayerSpeed*2, float(GetRandomValue(-spread, spread))) + (Input * PlayerSpeed);
                 EntitySystem::AwakeEntity(bullet->EntityID);
             }
         }

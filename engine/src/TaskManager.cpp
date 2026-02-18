@@ -33,11 +33,21 @@ void ThreadInfo::Run()
             break;
         }
 
-        Task* task = Tasks.front();
-        Tasks.pop_front();
+        IsProcessing.store(true);
+        Task* task = nullptr;
+        {
+            std::lock_guard<std::mutex> taskLock(TaskLock);
+      
+            task = Tasks.front();
+            Tasks.pop_front();
+        }
+       
         task->Execute();
+       
         if (OnTaskComplete)
             OnTaskComplete(task);
+
+        IsProcessing.store(false);
     }
     if (OnThreadAbort)
         OnThreadAbort(ThreadId);
@@ -58,19 +68,14 @@ void ThreadInfo::AbortTasks()
 
 bool ThreadInfo::IsIdle()
 {
-    std::lock_guard<std::mutex> lock(Lock);
-    for (auto& task : Tasks)
-    {
-        if (!task->IsComplete())
-            return false;
-    }
-    return Running.load();
+    std::lock_guard<std::mutex> lock(TaskLock);
+    return Tasks.empty() && !IsProcessing.load();
 }
 
 void ThreadInfo::AddTask(Task* task)
 {
     {
-        std::lock_guard<std::mutex> lock(Lock);
+        std::lock_guard<std::mutex> lock(TaskLock);
         Tasks.push_back(task);
     }
     Trigger.notify_one();

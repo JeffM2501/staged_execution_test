@@ -20,7 +20,7 @@ struct PlayerComponent : public EntitySystem::EntityComponent
 
     double LastShotTime = 0;
 
-    float ReloadTime = 0.5f;
+    float ReloadTime = 0.15f;
 
     void Update();
 };

@@ -31,6 +31,8 @@ std::atomic<Color> ClearColor = BLACK;
 
 std::atomic<float> FPSDeltaTime = 1.0f / 60.0f;
 
+std::unique_ptr<LambdaTask> LoaderTask;
+
 size_t BackgroundLayer = 0;
 size_t NPCLayer = 10;
 size_t PlayerLayer = 20;
@@ -68,15 +70,11 @@ Vector2 GetRandomVector(float scaler = 1)
 
 void SetupScene()
 {
-    WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
-
     auto player = EntitySystem::AddComponent<PlayerComponent>(EntitySystem::NewEntityId());
     player->AddComponent<TransformComponent>()->Position = Vector2(100, 200);
     player->Size = 10;
     player->Health = 100;
     player->PlayerSpeed = 200;
-
-    EntitySystem::AwakeEntity(player->EntityID);
 
     constexpr float nonPlayerSize = 20;
     constexpr float nonPlayerSpeed = 50;
@@ -90,10 +88,11 @@ void SetupScene()
         auto transform = npc->AddComponent<TransformComponent>();
         transform->Position = GetRandomPosInBounds(WorldBounds, nonPlayerSize);
         transform->Velocity = GetRandomVector(float(GetRandomValue(int(nonPlayerSpeed / 2), int(nonPlayerSpeed))));
-
-        if (i < npcCount-5)
-            EntitySystem::AwakeEntity(transform->EntityID);
     }
+
+    // pretend like loading takes time
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    EntitySystem::AwakeAllEntities();
 }
 
 // setup
@@ -139,7 +138,11 @@ void GameInit()
 
     RegisterTasks();
     RegisterComponents();
-    SetupScene();
+
+    WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
+
+    LoaderTask = std::make_unique<LambdaTask>(Hashes::CRC64Str("loader"), []() {SetupScene(); }, false);
+    TaskManager::RunOneShotTask(LoaderTask.get());
 }
 
 void GameCleanup()
@@ -155,6 +158,14 @@ double GetFrameStartTime()
 {
     return FrameStartTime.load();
 }
+
+/* TODO
+* Thread scene load
+* Add texture manager that loads in a thread (use tasks?)
+* Add Resource Manager that uses tasks.
+* Add Entity Loading from resource
+* Add Entity group tracking for loaded resources
+*/
 
 int main()
 {

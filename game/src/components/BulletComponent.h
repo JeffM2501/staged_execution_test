@@ -15,7 +15,7 @@ struct BulletComponent : public EntitySystem::EntityComponent
     double LastUpdateTime = 0;
 
     float Damage = 10;
-    float Lifetime = 2.0f;
+    float Lifetime = 3.0f;
 
     void Update();
 };
