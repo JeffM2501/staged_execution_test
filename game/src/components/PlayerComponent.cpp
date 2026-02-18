@@ -22,7 +22,9 @@ void PlayerComponent::Update()
                 bulletTransform->Position = transform->Position;
 
                 constexpr int spread = 50;
-                bulletTransform->Velocity = Vector2(PlayerSpeed*2, float(GetRandomValue(-spread, spread))) + (Input * PlayerSpeed);
+                float speed = PlayerSpeed * 2 + float(GetRandomValue(0, int(PlayerSpeed)));
+
+                bulletTransform->Velocity = Vector2(speed, float(GetRandomValue(-spread, spread))) + (Input * PlayerSpeed);
                 EntitySystem::AwakeEntity(bullet->EntityID);
             }
         }

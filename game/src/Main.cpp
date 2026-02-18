@@ -160,7 +160,6 @@ double GetFrameStartTime()
 }
 
 /* TODO
-* Thread scene load
 * Add texture manager that loads in a thread (use tasks?)
 * Add Resource Manager that uses tasks.
 * Add Entity Loading from resource
