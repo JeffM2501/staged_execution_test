@@ -5,8 +5,9 @@
 // - completed deque: processed objects
 // - all queue operations protected by mutexes
 // - background thread started once in ctor and waits on a condition_variable
-// - processing callable is supplied at construction time
+// - processing callable is supplied at construction time (or later via SetProcessorAndStart)
 // - safe stop/join in destructor
+// - optional thread lifecycle callbacks: OnThreadStart, OnThreadStop
 
 #include <deque>
 #include <mutex>
@@ -17,21 +18,27 @@
 #include <utility>
 #include <cassert>
 
+#include <iostream>
+#include <chrono>
+#include <vector>
+#include <algorithm>
+
 template<typename T>
 class ThreadedProcessor
 {
 public:
-    // Processor callable should accept T (or const T&) and return T (processed result).
-    // We accept any callable and wrap it to a canonical `T(T)` form.
-    template<typename F>
-    explicit ThreadedProcessor(F&& processorFunc)
-    {
-        // wrap arbitrary callable so we can always call Processor(T)
-        auto call = std::forward<F>(processorFunc);
-        Processor = [call](T v) mutable -> T { return call(std::move(v)); };
+    // Default constructor: does not start the worker thread.
+    ThreadedProcessor() = default;
 
-        Running.store(true, std::memory_order_release);
-        Worker = std::thread(&ThreadedProcessor::ThreadMain, this);
+    // Constructor that sets processor and starts the thread immediately.
+    // Optional lifecycle callbacks can be provided.
+    template<typename F>
+    explicit ThreadedProcessor(F&& processorFunc,
+        const std::function<void()>& onStart = nullptr,
+        const std::function<void()>& onEnd = nullptr)
+    {
+        // Delegate to SetProcessorAndStart to avoid duplication
+        SetProcessorAndStart(std::forward<F>(processorFunc), onStart, onEnd);
     }
 
     // Not copyable
@@ -126,9 +133,69 @@ public:
         }
     }
 
+    // Set optional callbacks for thread lifecycle.
+    // Thread-safety: the setter grabs CallbackMutex to assign the callback.
+    void SetOnThreadStart(const std::function<void()>& cb)
+    {
+        std::lock_guard<std::mutex> lk(CallbackMutex);
+        OnThreadStart = cb;
+    }
+    void SetOnThreadStart(std::function<void()>&& cb)
+    {
+        std::lock_guard<std::mutex> lk(CallbackMutex);
+        OnThreadStart = std::move(cb);
+    }
+
+    void SetOnThreadStop(const std::function<void()>& cb)
+    {
+        std::lock_guard<std::mutex> lk(CallbackMutex);
+        OnThreadStop = cb;
+    }
+    void SetOnThreadStop(std::function<void()>&& cb)
+    {
+        std::lock_guard<std::mutex> lk(CallbackMutex);
+        OnThreadStop = std::move(cb);
+    }
+
+    // Set processor function and start the worker thread.
+    // Returns true if the thread was started, false if already running or already started before.
+    template<typename F>
+    bool SetProcessorAndStart(F&& processorFunc,
+        const std::function<void()>& onStart = nullptr,
+        const std::function<void()>& onEnd = nullptr)
+    {
+        std::lock_guard<std::mutex> lk(StartMutex);
+
+        // If already running, do not start again
+        if (Running.load(std::memory_order_acquire)) return false;
+        // If worker is joinable it means it was started previously and not joinable? treat as cannot restart.
+        if (Worker.joinable()) return false;
+
+        // wrap arbitrary callable so we can always call Processor(T)
+        auto call = std::forward<F>(processorFunc);
+        Processor = [call](T v) mutable -> T { return call(std::move(v)); };
+
+        if (onStart) SetOnThreadStart(onStart);
+        if (onEnd) SetOnThreadStop(onEnd);
+
+        Running.store(true, std::memory_order_release);
+        Worker = std::thread(&ThreadedProcessor::ThreadMain, this);
+        return true;
+    }
+
 private:
     void ThreadMain()
     {
+        // Invoke start callback if set
+        {
+            std::function<void()> cb;
+            {
+                std::lock_guard<std::mutex> lk(CallbackMutex);
+                cb = OnThreadStart;
+            }
+            if (cb) cb();
+        }
+
         while (true)
         {
             T item;
@@ -157,7 +224,6 @@ private:
             catch (...)
             {
                 // Swallow exceptions to keep worker alive. In case of error, user can push error sentinel into completed.
-                // Optionally, you can rethrow or store an error indicator in completed queue.
                 continue;
             }
 
@@ -167,28 +233,44 @@ private:
                 Completed.push_back(std::move(result));
             }
         }
+
+        // Invoke stop callback if set
+        {
+            std::function<void()> cb;
+            {
+                std::lock_guard<std::mutex> lk(CallbackMutex);
+                cb = OnThreadStop;
+            }
+            if (cb) cb();
+        }
     }
 
 private:
+    // Processing callable
     std::function<T(T)> Processor;
+
+    // Queues and locks
     mutable std::mutex PendingMutex;
     mutable std::mutex CompletedMutex;
     std::deque<T> Pending;
     std::deque<T> Completed;
 
+    // Thread and synchronization
     std::condition_variable Cv;
     std::thread Worker;
     std::atomic<bool> Running{ false };
+
+    // Optional lifecycle callbacks
+    std::mutex CallbackMutex;
+    std::function<void()> OnThreadStart;
+    std::function<void()> OnThreadStop;
+
+    // Guard for starting the worker once
+    std::mutex StartMutex;
 };
 
 
-#include <iostream>
-#include <chrono>
-#include <thread>
-#include <vector>
-#include <algorithm>
-#include <cassert>
-
+// -------------------- Inline unit test helpers (kept here for convenience) --------------------
 namespace UnitTest
 {
 
@@ -298,6 +380,34 @@ namespace UnitTest
             std::vector<int> got = { a, b };
             std::sort(got.begin(), got.end());
             assert(got[0] == 25 && got[1] == 36);
+        }
+
+        // Test 4: Thread lifecycle callbacks + delayed start via SetProcessorAndStart
+        {
+            bool started = false;
+            bool stopped = false;
+
+            // Create without starting
+            ThreadedProcessor<int> proc;
+            proc.SetOnThreadStart([&]() { started = true; });
+            proc.SetOnThreadStop([&]() { stopped = true; });
+
+            // Start with processor now
+            bool startedOk = proc.SetProcessorAndStart([](int v) { return v + 2; });
+            assert(startedOk && "SetProcessorAndStart should have started the thread");
+
+            // Give thread a moment to start and invoke the start callback
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            assert(started && "OnThreadStart should have been called after thread start.");
+
+            proc.PushPending(1);
+            bool ok = waitForCompleted(proc, 1, 1000);
+            assert(ok && "Processing should complete");
+
+            proc.Stop();
+            // Give a moment for stop callback to be invoked after thread exit
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            assert(stopped && "OnThreadStop should have been called after thread exit.");
         }
 
         std::cout << "All ThreadedProcessor tests passed.\n";
