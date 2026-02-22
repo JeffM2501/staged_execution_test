@@ -3,9 +3,6 @@
 #include "GLFW/glfw3.h"
 
 #include <unordered_map>
-#include <deque>
-#include <thread>
-#include <mutex>
 
 #include "ThreadedProcessor.h"
 
