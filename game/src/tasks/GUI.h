@@ -3,11 +3,12 @@
 #include "Task.h"
 
 #include "raylib.h"
+#include "TextureManager.h"
 
 class GUITask : public Task
 {
 private:
-    Texture     Logo;
+    TextureManager::TextureReference     Logo;
 
 public:
     DECLARE_TASK(GUITask);

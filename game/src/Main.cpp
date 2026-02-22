@@ -8,6 +8,7 @@
 #include "EntitySystem.h"
 #include "ValueTracker.h"
 #include "ComponentTasks.h"
+#include "TextureManager.h"
 
 #include "GameInfo.h"
 
@@ -131,6 +132,8 @@ void GameInit()
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(1280, 800, "Task Test");
     SetTargetFPS(GetMonitorRefreshRate(0));
+
+    TextureManager::Init();
    
     FPSDeltaTime = 1.0f / float(GetMonitorRefreshRate(0));
 
@@ -150,6 +153,7 @@ void GameCleanup()
     EntitySystem::ClearAllEntities();
     TaskManager::Cleanup();
     PresentationManager::Cleanup();
+    TextureManager::Shutdown();
     CloseWindow();
 }
 
@@ -178,7 +182,7 @@ int main()
 #endif
         if (IsWindowResized())
             WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
-
+        TextureManager::Update();
         PresentationManager::Update();
         ClearBackground(ClearColor.load());
 

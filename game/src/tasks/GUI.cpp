@@ -5,12 +5,11 @@
 
 GUITask::GUITask() : Task(FrameStage::PreDraw, true)
 {
-    Logo = LoadTexture("resources/logo.png");
+    Logo = TextureManager::GetTexture(101010101010);
 }
 
 GUITask::~GUITask()
 { 
-    UnloadTexture(Logo);
 }
 
 void GUITask::Tick()
@@ -19,6 +18,6 @@ void GUITask::Tick()
    
     Rectangle layerBounds = PresentationManager::GetCurrentLayerRect();
 
-    DrawTexture(Logo, int(layerBounds.x), int(layerBounds.y + layerBounds.height - Logo.height), WHITE);
+    DrawTexture(Logo->ID, int(layerBounds.x), int(layerBounds.y + layerBounds.height - Logo->Bounds.height), WHITE);
     PresentationManager::EndLayer();
 }

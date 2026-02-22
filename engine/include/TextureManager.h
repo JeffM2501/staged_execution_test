@@ -23,5 +23,7 @@ namespace TextureManager
     void Init();
     void Shutdown();
 
+    void Update();
+
     TextureReference GetTexture(size_t hash);
 }
