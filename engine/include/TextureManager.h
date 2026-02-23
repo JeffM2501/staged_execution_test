@@ -11,10 +11,19 @@
 
 namespace TextureManager
 {
+    enum class TextureLoadState : uint8_t
+    {
+        DataLoading,
+        GPULoading,
+        Ready,
+        Invalidated,
+        Failed
+    };
     struct TextureInfo
     {
         Texture ID = { 0 };
-        std::atomic_bool Ready = false;
+        std::atomic<TextureLoadState> Ready = TextureLoadState::Invalidated;
+
         Rectangle Bounds = { 0,0,0,0 };
     };
     

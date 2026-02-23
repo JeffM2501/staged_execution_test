@@ -9,6 +9,7 @@
 #include "ValueTracker.h"
 #include "ComponentTasks.h"
 #include "TextureManager.h"
+#include "ResourceManager.h"
 
 #include "GameInfo.h"
 
@@ -128,6 +129,7 @@ void RegisterLayers()
 void GameInit()
 {
     TaskManager::Init();
+    ResourceManager::Init();
     EntitySystem::Init();
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
@@ -154,6 +156,7 @@ void GameCleanup()
     EntitySystem::ClearAllEntities();
     TaskManager::Cleanup();
     PresentationManager::Cleanup();
+    ResourceManager::Shutdown();
     TextureManager::Shutdown();
     CloseWindow();
 }
@@ -183,6 +186,8 @@ int main()
 #endif
         if (IsWindowResized())
             WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
+
+        ResourceManager::Update();
         TextureManager::Update();
         PresentationManager::Update();
         ClearBackground(ClearColor.load());
