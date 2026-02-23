@@ -25,7 +25,6 @@
 
 #include <atomic>
 
-
 // global stuff
 bool UseInterpolateNPCs = true;
 

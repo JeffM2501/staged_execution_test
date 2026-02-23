@@ -1,12 +1,14 @@
 #pragma once
 
 #include "CRC64.h"
+#include "ResourceManager.h"
 
 #include <functional>
 #include <memory>
 #include <algorithm>
 #include <execution>
 #include <mutex>
+#include <vector>
 
 #define DECLARE_COMPONENT(CompoentName) \
 static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); }
@@ -274,4 +276,19 @@ namespace EntitySystem
     void ClearAllEntities();
 
     void FlushMorgue();
+
+    // EntityReader reads entity/component data from a binary file using the resource manager file type.
+    class EntityReader
+    {
+    public:
+        // Reads entities and components from a resource file (ResourceManager).
+        // Each entity is created with the ID from the file, and components are added by component ID.
+        // For each component, the buffer is passed to OnComponentData for initialization.
+        void ReadEntitiesFromResource(size_t resourceHash);
+
+    protected:
+        // Called for each created component, passing the buffer with component data.
+        // Override this in derived classes to handle component-specific deserialization.
+        virtual void OnComponentData(EntityComponent* component, const std::vector<uint8_t>& buffer) = 0;
+    };
 }
