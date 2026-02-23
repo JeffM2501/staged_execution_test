@@ -19,7 +19,7 @@ namespace TextureManager
     {
         Texture GPUTexture = { 0 };
         size_t ID = 0;
-        Image ImageData = { 0 };
+        ResourceManager::ResourceInfoRef Resource;
     };
 
     ThreadedProcessor<PendingTextureLoad> TextureLoaderThread;
@@ -44,9 +44,15 @@ namespace TextureManager
             });
 
         TextureLoaderThread.SetProcessorAndStart([](PendingTextureLoad pending) -> PendingTextureLoad 
+        {
+            auto imgData = std::get_if<Image>(&pending.Resource->Data);
+            if (imgData)
             {
-            pending.GPUTexture = LoadTexture(pending.ResourceFile.c_str());
-            glFlush();
+                pending.GPUTexture = LoadTextureFromImage(*imgData);
+                glFlush();
+            }
+
+            pending.Resource->Release();
             return pending;
         });
     }
@@ -63,10 +69,16 @@ namespace TextureManager
                 TraceLog(LOG_ERROR, "Texture ID %zu loaded but not found", completed.ID);
                 continue;
             }
-
-            texture->second->ID = completed.GPUTexture;
-            texture->second->Ready.store(TextureLoadState::Ready);
-            texture->second->Bounds = Rectangle{ 0,0, float(completed.GPUTexture.width), float(completed.GPUTexture.height) };
+            if (!IsTextureValid(completed.GPUTexture))
+            {
+                texture->second->Ready.store(TextureLoadState::Failed);
+            }
+            else
+            {
+                texture->second->ID = completed.GPUTexture;
+                texture->second->Ready.store(TextureLoadState::Ready);
+                texture->second->Bounds = Rectangle{ 0,0, float(completed.GPUTexture.width), float(completed.GPUTexture.height) };
+            }
         }
     }
 
@@ -107,20 +119,14 @@ namespace TextureManager
 
         LoadedTextures.insert_or_assign(hash, ref);
 
-        ResourceManager::LoadResource(hash, ResourceManager::ResourceType::Image, [hash](const ResourceInfoRef& resource)
+        ResourceManager::LoadResource(hash, ResourceManager::ResourceType::Image, [hash](const ResourceManager::ResourceInfoRef& resource)
             {
                 PendingTextureLoad pending;
 
-
                 pending.ID = hash;
-                pending.ImageData LoadImage() = TextFormat("resources/textures/%zu.png", hash);
+                pending.Resource = resource;
                 TextureLoaderThread.PushPending(pending);
-
-
             });
-
-     
-       
 
         return ref;
     }
