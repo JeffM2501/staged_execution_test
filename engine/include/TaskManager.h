@@ -66,7 +66,7 @@ namespace TaskManager
     static constexpr float FixedFPS = 50.0f;
 
     void Init();
-    void Cleanup();
+    void Shutdown();
 
     void TickFrame();
 

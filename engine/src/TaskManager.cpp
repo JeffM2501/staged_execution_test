@@ -117,7 +117,7 @@ namespace TaskManager
         }
     }
 
-    void Cleanup()
+    void Shutdown()
     {
         for (auto& thread : Threads)
         {

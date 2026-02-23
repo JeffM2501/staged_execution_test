@@ -27,5 +27,5 @@ namespace PresentationManager
     void ClearLayerShader(size_t layer);
 
     void Present();
-    void Cleanup();
+    void Shutdown();
 }

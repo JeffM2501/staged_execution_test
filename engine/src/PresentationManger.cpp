@@ -226,7 +226,7 @@ namespace PresentationManager
         }
     }
 
-    void Cleanup()
+    void Shutdown()
     {
         for (auto& layer : Layers)
         {

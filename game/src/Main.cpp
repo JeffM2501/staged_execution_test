@@ -154,8 +154,8 @@ void GameInit()
 void GameCleanup()
 {
     EntitySystem::ClearAllEntities();
-    TaskManager::Cleanup();
-    PresentationManager::Cleanup();
+    TaskManager::Shutdown();
+    PresentationManager::Shutdown();
     ResourceManager::Shutdown();
     TextureManager::Shutdown();
     CloseWindow();
@@ -168,8 +168,6 @@ double GetFrameStartTime()
 }
 
 /* TODO
-* Add texture manager that loads in a thread (use tasks?)
-* Add Resource Manager that uses tasks.
 * Add Entity Loading from resource
 * Add Entity group tracking for loaded resources
 */
