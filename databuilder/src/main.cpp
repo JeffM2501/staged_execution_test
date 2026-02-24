@@ -42,24 +42,42 @@ int main()
         for (auto& entity : entityList->value.GetArray())
         {
             int64_t entityId = entity["ID"].GetInt64();
-            size_t componentCount = entity["Components"].Size();
-
-            binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&entityId), reinterpret_cast<uint8_t*>(&entityId) + sizeof(entityId));
-            binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&componentCount), reinterpret_cast<uint8_t*>(&componentCount) + sizeof(componentCount));
-
-            for (auto& comp : entity["Components"].GetArray())
+            auto componentList = entity.FindMember("Components");
+      
+            if (componentList->value.IsObject())
             {
-                std::string type = comp["Type"].GetString();
-                size_t componentId = Hashes::CRC64Str(type.c_str());
+                uint32_t componentCount = 0;
+                for (auto& m : componentList->value.GetObject())
+                    ++componentCount;
 
-                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&componentId), reinterpret_cast<uint8_t*>(&componentId) + sizeof(componentId));
 
-                std::vector<uint8_t> compData;
-                ComponentSerialization::Serialize(type, comp, compData);
+                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&entityId), reinterpret_cast<uint8_t*>(&entityId) + sizeof(entityId));
+                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&componentCount), reinterpret_cast<uint8_t*>(&componentCount) + sizeof(componentCount));
 
-                uint32_t dataSize = static_cast<uint32_t>(compData.size());
-                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&dataSize), reinterpret_cast<uint8_t*>(&dataSize) + sizeof(dataSize));
-                binary.insert(binary.end(), compData.begin(), compData.end());
+                for (auto& m : componentList->value.GetObject())
+                {
+                    const char* name = m.name.GetString();
+                    const rapidjson::Value& compValue = m.value;
+
+                    // Use member name as type if the component doesn't include a "Type" field
+                    std::string type;
+                    auto typeIt = compValue.FindMember("Type");
+                    if (typeIt != compValue.MemberEnd() && typeIt->value.IsString())
+                        type = typeIt->value.GetString();
+                    else
+                        type = name;
+
+                    uint64_t componentId = Hashes::CRC64Str(type);
+
+                    binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&componentId), reinterpret_cast<uint8_t*>(&componentId) + sizeof(componentId));
+
+                    std::vector<uint8_t> compData;
+                    ComponentSerialization::Serialize(type, compValue, compData);
+
+                    uint32_t dataSize = static_cast<uint32_t>(compData.size());
+                    binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&dataSize), reinterpret_cast<uint8_t*>(&dataSize) + sizeof(dataSize));
+                    binary.insert(binary.end(), compData.begin(), compData.end());
+                }
             }
         }
 
