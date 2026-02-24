@@ -6,6 +6,7 @@
 #include <memory>
 #include <unordered_map>
 #include <set>
+#include <span>
 
 namespace EntitySystem
 {
@@ -170,56 +171,5 @@ namespace EntitySystem
             {
                 func(component);
             }, paralel, enabledOnly);
-    }
-
-    void EntityReader::ReadEntitiesFromResource(size_t resourceHash)
-    {
-        using namespace ResourceManager;
-        auto resource = LoadResource(resourceHash, ResourceType::File);
-        if (!resource || !resource->IsReady())
-            return;
-
-        std::lock_guard<std::mutex> lock(resource->Lock);
-        const auto& dataVariant = resource->Data;
-        if (!std::holds_alternative<std::vector<unsigned char>>(dataVariant))
-            return;
-
-        const auto& data = std::get<std::vector<unsigned char>>(dataVariant);
-        size_t offset = 0;
-
-        while (offset + sizeof(size_t) * 2 <= data.size())
-        {
-            size_t entityId;
-            size_t componentCount;
-            memcpy(&entityId, &data[offset], sizeof(size_t));
-            offset += sizeof(size_t);
-            memcpy(&componentCount, &data[offset], sizeof(size_t));
-            offset += sizeof(size_t);
-
-            for (size_t i = 0; i < componentCount; ++i)
-            {
-                if (offset + sizeof(size_t) + sizeof(uint32_t) > data.size())
-                    return;
-
-                size_t componentId;
-                uint32_t dataSize;
-                memcpy(&componentId, &data[offset], sizeof(size_t));
-                offset += sizeof(size_t);
-                memcpy(&dataSize, &data[offset], sizeof(uint32_t));
-                offset += sizeof(uint32_t);
-
-                if (offset + dataSize > data.size())
-                    return;
-
-                std::vector<uint8_t> buffer(data.begin() + offset, data.begin() + offset + dataSize);
-                offset += dataSize;
-
-                EntityComponent* component = AddComponent(entityId, componentId);
-                if (component)
-                {
-                    OnComponentData(component, buffer);
-                }
-            }
-        }
     }
 }

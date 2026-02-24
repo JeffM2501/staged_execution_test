@@ -2,14 +2,6 @@
 
 namespace ComponentSerialization
 {
-    template<typename T>
-    void WriteToOut(const T& value, std::vector<uint8_t>& out)
-    {
-        out.insert(out.end(),
-            reinterpret_cast<const uint8_t*>(&value),
-            reinterpret_cast<const uint8_t*>(&value) + sizeof(T));
-    }
-
     void SerializeTransform(const rapidjson::Value& j, std::vector<uint8_t>& out)
     {
         float position[2] = { 0,0 };

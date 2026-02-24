@@ -10,6 +10,7 @@
 #include "ComponentTasks.h"
 #include "TextureManager.h"
 #include "ResourceManager.h"
+#include "EntityReader.h"
 
 #include "GameInfo.h"
 
@@ -72,11 +73,11 @@ Vector2 GetRandomVector(float scaler = 1)
 
 void SetupScene()
 {
-    auto player = EntitySystem::AddComponent<PlayerComponent>(EntitySystem::NewEntityId());
-    player->AddComponent<TransformComponent>()->Position = Vector2(100, 200);
-    player->Size = 10;
-    player->Health = 100;
-    player->PlayerSpeed = 200;
+//     auto player = EntitySystem::AddComponent<PlayerComponent>(EntitySystem::NewEntityId());
+//     player->AddComponent<TransformComponent>()->Position = Vector2(100, 200);
+//     player->Size = 10;
+//     player->Health = 100;
+//     player->PlayerSpeed = 200;
 
     constexpr float nonPlayerSize = 20;
     constexpr float nonPlayerSpeed = 50;
@@ -125,6 +126,33 @@ void RegisterLayers()
     DebugLayer = PresentationManager::DefineLayer(uint8_t(DebugLayer));
 }
 
+class ComponentReader : public EntityReader::Reader
+{
+protected:
+    void OnComponentData(EntitySystem::EntityComponent* component, size_t componentId, EntityReader::BufferReader& buffer) override
+    {
+        // find the deserializer and call it
+        if (componentId == TransformComponent::GetComponentId())
+        {
+            auto transform = static_cast<TransformComponent*>(component);
+            transform->Position.x = buffer.Read<float>();
+            transform->Position.y = buffer.Read<float>();
+            transform->Velocity.x = buffer.Read<float>();
+            transform->Velocity.y = buffer.Read<float>();
+        }
+        else if (componentId == PlayerComponent::GetComponentId())
+        {
+            auto player = static_cast<PlayerComponent*>(component);
+            player->Size = buffer.Read<float>();
+            player->Health = buffer.Read<float>();
+            player->PlayerSpeed = buffer.Read<float>();
+            player->ReloadTime = buffer.Read<float>();
+        }
+    }
+};
+
+ComponentReader Reader;
+
 void GameInit()
 {
     TaskManager::Init();
@@ -143,6 +171,8 @@ void GameInit()
 
     RegisterTasks();
     RegisterComponents();
+
+    Reader.ReadEntitiesFromResource(12975522424435480105);
 
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
 

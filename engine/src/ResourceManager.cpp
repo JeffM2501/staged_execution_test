@@ -311,12 +311,8 @@ void ResourceInfo::Release()
     }
 }
 
-
-
-
 namespace UnitTest
 {
-
     using namespace ResourceManager;
     namespace fs = std::filesystem;
 

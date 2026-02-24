@@ -50,10 +50,9 @@ int main()
                 for (auto& m : componentList->value.GetObject())
                     ++componentCount;
 
-
-                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&entityId), reinterpret_cast<uint8_t*>(&entityId) + sizeof(entityId));
-                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&componentCount), reinterpret_cast<uint8_t*>(&componentCount) + sizeof(componentCount));
-
+                WriteToOut(entityId, binary);
+                WriteToOut(componentCount, binary);
+               
                 for (auto& m : componentList->value.GetObject())
                 {
                     const char* name = m.name.GetString();
@@ -69,7 +68,7 @@ int main()
 
                     uint64_t componentId = Hashes::CRC64Str(type);
 
-                    binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&componentId), reinterpret_cast<uint8_t*>(&componentId) + sizeof(componentId));
+                    WriteToOut(componentId, binary);
 
                     std::vector<uint8_t> compData;
                     ComponentSerialization::Serialize(type, compValue, compData);

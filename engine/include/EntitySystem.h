@@ -9,12 +9,15 @@
 #include <execution>
 #include <mutex>
 #include <vector>
+#include <span>
 
 #define DECLARE_COMPONENT(CompoentName) \
-static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); }
+static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); } \
+size_t ComponentId() const override{ return Hashes::CRC64Str(#CompoentName); }
 
 #define DECLARE_SIMPLE_COMPONENT(CompoentName) \
 static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); } \
+size_t ComponentId() const override { return Hashes::CRC64Str(#CompoentName);  }\
 CompoentName(size_t entityId) : EntityComponent(entityId) {}
 
 namespace EntitySystem
@@ -38,6 +41,9 @@ namespace EntitySystem
             : EntityID(entityId)
         {
         }
+
+        virtual ~EntityComponent() = default;
+        virtual size_t ComponentId() const = 0;
 
         template<class T>
         T* AddComponent()
@@ -276,19 +282,4 @@ namespace EntitySystem
     void ClearAllEntities();
 
     void FlushMorgue();
-
-    // EntityReader reads entity/component data from a binary file using the resource manager file type.
-    class EntityReader
-    {
-    public:
-        // Reads entities and components from a resource file (ResourceManager).
-        // Each entity is created with the ID from the file, and components are added by component ID.
-        // For each component, the buffer is passed to OnComponentData for initialization.
-        void ReadEntitiesFromResource(size_t resourceHash);
-
-    protected:
-        // Called for each created component, passing the buffer with component data.
-        // Override this in derived classes to handle component-specific deserialization.
-        virtual void OnComponentData(EntityComponent* component, const std::vector<uint8_t>& buffer) = 0;
-    };
 }
