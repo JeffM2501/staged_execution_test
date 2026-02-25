@@ -73,15 +73,9 @@ Vector2 GetRandomVector(float scaler = 1)
 
 void SetupScene()
 {
-//     auto player = EntitySystem::AddComponent<PlayerComponent>(EntitySystem::NewEntityId());
-//     player->AddComponent<TransformComponent>()->Position = Vector2(100, 200);
-//     player->Size = 10;
-//     player->Health = 100;
-//     player->PlayerSpeed = 200;
-
     constexpr float nonPlayerSize = 20;
     constexpr float nonPlayerSpeed = 50;
-    constexpr size_t npcCount = 2;
+    constexpr size_t npcCount = 200;
 
     for (size_t i = 0; i < npcCount; i++)
     {

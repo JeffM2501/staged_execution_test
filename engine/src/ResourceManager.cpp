@@ -10,9 +10,7 @@
 #include <chrono>
 #include <cassert>
 
-using namespace ResourceManager;
-
-namespace
+namespace ResourceManager
 {
     struct PendingLoad
     {
@@ -29,8 +27,8 @@ namespace
     static std::atomic<size_t> RoundRobinIndex{ 0 };
 
     // Map of active resources
-    static std::unordered_map<size_t, ResourceInfoRef> Resources;
-    static std::mutex ResourcesMutex;
+    static std::unordered_map<size_t, ResourceInfoRef>  Resources;
+    static std::recursive_mutex                         ResourcesMutex;
 
     // Helper: compute resource file path from id + type (adjust as needed)
     static std::string BuildPath(size_t id, ResourceType type)
@@ -106,208 +104,199 @@ namespace
         if (!info->Ready) return;
 
         std::visit([&](auto&& value)
-        {
-            using V = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<V, Image>)
             {
-                UnloadImage(value);
-            }
-            else if constexpr (std::is_same_v<V, Wave>)
-            {
-                UnloadWave(value);
-            }
-            else if constexpr (std::is_same_v<V, std::vector<unsigned char>>)
-            {
-                value.clear();
-                value.shrink_to_fit();
-            }
-            else
-            {
-                // monostate -> nothing
-            }
-        }, info->Data);
+                using V = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<V, Image>)
+                {
+                    UnloadImage(value);
+                }
+                else if constexpr (std::is_same_v<V, Wave>)
+                {
+                    UnloadWave(value);
+                }
+                else if constexpr (std::is_same_v<V, std::vector<unsigned char>>)
+                {
+                    value.clear();
+                    value.shrink_to_fit();
+                }
+                else
+                {
+                    // monostate -> nothing
+                }
+            }, info->Data);
 
         info->Data = ResourceData{}; // reset
         info->Ready.store(false, std::memory_order_release);
     }
-}
 
-// Public API
 
-void ResourceManager::Init()
-{
-    std::lock_guard<std::mutex> lk(ResourcesMutex);
-    if (!Loaders.empty()) return; // already initialized
+    // Public API
 
-    Loaders.resize(LoaderThreadCount);
-    for (int i = 0; i < LoaderThreadCount; ++i)
+    void Init()
     {
-        Loaders[i] = std::make_unique<ThreadedProcessor<PendingLoad>>();
-        Loaders[i]->SetProcessorAndStart(&LoaderFunction);
-    }
-}
+        std::lock_guard<std::recursive_mutex> lk(ResourcesMutex);
+        if (!Loaders.empty()) return; // already initialized
 
-void ResourceManager::Shutdown()
-{
-    // Stop loaders
-    for (auto& loader : Loaders)
-    {
-        if (loader) loader->Stop();
-    }
-
-    // Drain completed items so we can properly free memory
-    Update();
-
-    // Unload and clear resources
-    std::lock_guard<std::mutex> lk(ResourcesMutex);
-    for (auto& kv : Resources)
-    {
-        auto& info = kv.second;
-        if (info)
+        Loaders.resize(LoaderThreadCount);
+        for (int i = 0; i < LoaderThreadCount; ++i)
         {
-            UnloadResourceData(info);
+            Loaders[i] = std::make_unique<ThreadedProcessor<PendingLoad>>();
+            Loaders[i]->SetProcessorAndStart(&LoaderFunction);
         }
     }
-    Resources.clear();
 
-    Loaders.clear();
-}
-
-void ResourceManager::Update()
-{
-    // Poll completed queues from all loaders
-    for (auto& loader : Loaders)
+    void Shutdown()
     {
-        if (!loader) continue;
-        PendingLoad completed;
-        while (loader->PopCompleted(completed))
+        // Stop loaders
+        for (auto& loader : Loaders)
         {
-            ResourceInfoRef info = completed.Info;
-            if (!info) continue;
+            if (loader) loader->Stop();
+        }
 
-            {
-                std::lock_guard<std::mutex> lk(info->Lock);
-                // Move loaded data into ResourceInfo
-                info->Data = std::move(completed.Data);
-                info->Ready.store(true, std::memory_order_release);
-            }
+        // Drain completed items so we can properly free memory
+        Update();
 
-            // Invoke callbacks outside lock
-            std::vector<OnLoadedCb> callbacks;
+        // Unload and clear resources
+        std::lock_guard<std::recursive_mutex> lk(ResourcesMutex);
+        for (auto& kv : Resources)
+        {
+            auto& info = kv.second;
+            if (info)
             {
-                std::lock_guard<std::mutex> lk(info->Lock);
-                callbacks.swap(info->Callbacks); // move callbacks out
-            }
-
-            for (auto& cb : callbacks)
-            {
-                if (cb) cb(info);
+                UnloadResourceData(info);
             }
         }
-    }
-}
+        Resources.clear();
 
-ResourceInfoRef ResourceManager::LoadResource(size_t hash, ResourceType type, OnLoadedCb onLoaded)
-{
+        Loaders.clear();
+    }
+
+    void Update()
     {
-        std::lock_guard<std::mutex> lk(ResourcesMutex);
-        auto it = Resources.find(hash);
-        if (it != Resources.end())
+        // Poll completed queues from all loaders
+        for (auto& loader : Loaders)
         {
-            auto info = it->second;
-            // increment use count and attach callback if requested
-            info->AddRef();
-            if (onLoaded)
+            if (!loader) continue;
+            PendingLoad completed;
+            while (loader->PopCompleted(completed))
             {
-                // if already ready, call immediately (call outside of ResourcesMutex to avoid deadlock)
-                bool ready = info->IsReady();
-                if (ready)
+                ResourceInfoRef info = completed.Info;
+                if (!info) continue;
+
                 {
-                    // call outside lock
-                   // lk.unlock() // no-op placeholder to indicate careful ordering (we will call outside)
+                    std::lock_guard<std::mutex> lk(info->Lock);
+                    // Move loaded data into ResourceInfo
+                    info->Data = std::move(completed.Data);
+                    info->Ready.store(true, std::memory_order_release);
                 }
-                // attach callback under info lock
-                std::lock_guard<std::mutex> lk2(info->Lock);
-                info->Callbacks.push_back(onLoaded);
+
+                // Invoke callbacks outside lock
+                std::vector<OnLoadedCb> callbacks;
+                {
+                    std::lock_guard<std::mutex> lk(info->Lock);
+                    callbacks.swap(info->Callbacks); // move callbacks out
+                }
+
+                for (auto& cb : callbacks)
+                {
+                    if (cb) cb(info);
+                }
             }
-            // If already ready and callback was provided, call it now (outside locks)
-            if (onLoaded && info->IsReady())
-            {
-                onLoaded(info);
-            }
-            return info;
         }
     }
 
-    // Create a new ResourceInfo
-    auto info = std::make_shared<ResourceInfo>();
-    info->ID = hash;
-    info->Type = type;
-    info->Ready.store(false);
-    info->UseCount.store(1);
-
-    if (onLoaded)
+    ResourceInfoRef LoadResource(size_t hash, ResourceType type, OnLoadedCb onLoaded)
     {
-        std::lock_guard<std::mutex> lk(info->Lock);
-        info->Callbacks.push_back(onLoaded);
-    }
-
-    {
-        std::lock_guard<std::mutex> lk(ResourcesMutex);
-        Resources.emplace(hash, info);
-    }
-
-    // Build pending load and assign to a loader using round-robin
-    PendingLoad pending;
-    pending.ID = hash;
-    pending.Type = type;
-    pending.Path = BuildPath(hash, type);
-    pending.Info = info;
-
-    size_t idx = RoundRobinIndex.fetch_add(1, std::memory_order_relaxed);
-    idx %= Loaders.size();
-    Loaders[idx]->PushPending(std::move(pending));
-
-    return info;
-}
-
-void ResourceManager::ReleaseResourceById(size_t id)
-{
-    ResourceInfoRef info;
-    {
-        std::lock_guard<std::mutex> lk(ResourcesMutex);
-        auto it = Resources.find(id);
-        if (it == Resources.end()) return;
-        info = it->second;
-    }
-
-    // If still has users, nothing to do
-    int cur = info->UseCount.load(std::memory_order_acquire);
-    if (cur > 0) return;
-
-    // Unload memory on main thread
-    UnloadResourceData(info);
-
-    // Remove from map
-    {
-        std::lock_guard<std::mutex> lk(ResourcesMutex);
-        // Only erase if the entry still points to the same info and UseCount == 0 and not Ready (we unloaded)
-        auto it = Resources.find(id);
-        if (it != Resources.end() && it->second == info)
         {
+            std::lock_guard<std::recursive_mutex> lk(ResourcesMutex);
+            auto it = Resources.find(hash);
+            if (it != Resources.end())
+            {
+                auto info = it->second;
+                // increment use count and attach callback if requested
+                info->UseCount.store(info->UseCount.load()+1);
+                if (onLoaded)
+                {
+                    // if already ready, call immediately (call outside of ResourcesMutex to avoid deadlock)
+                   
+                    if (info->IsReady())
+                    {
+                        if (onLoaded && info->IsReady())
+                        {
+                            onLoaded(info);
+                        }
+                    }
+                    else
+                    {
+                        // attach callback under info lock
+                        std::lock_guard<std::mutex> lk2(info->Lock);
+                        info->Callbacks.push_back(onLoaded);
+                    }
+                }
+   
+                return info;
+            }
+        }
+
+        // Create a new ResourceInfo
+        auto info = std::make_shared<ResourceInfo>();
+        info->ID = hash;
+        info->Type = type;
+        info->Ready.store(false);
+        info->UseCount.store(1);
+
+        {
+            std::lock_guard<std::recursive_mutex> lk(ResourcesMutex);
+            Resources.emplace(hash, info);
+        }
+
+        if (onLoaded)
+        {
+            std::lock_guard<std::mutex> lk2(info->Lock);
+            info->Callbacks.push_back(onLoaded);
+        }
+
+   
+        // Build pending load and assign to a loader using round-robin
+        PendingLoad pending;
+        pending.ID = hash;
+        pending.Type = type;
+        pending.Path = BuildPath(hash, type);
+        pending.Info = info;
+
+        size_t idx = RoundRobinIndex.fetch_add(1, std::memory_order_relaxed);
+        idx %= Loaders.size();
+        Loaders[idx]->PushPending(std::move(pending));
+
+        return info;
+    }
+
+    void ReleaseResourceById(size_t id)
+    {
+        ResourceInfoRef info;
+        {
+            std::lock_guard<std::recursive_mutex> lk(ResourcesMutex);
+            auto it = Resources.find(id);
+            if (it == Resources.end()) 
+                return;
+            info = it->second;
+
+            // Unload memory on main thread
+            UnloadResourceData(info);
+
             Resources.erase(it);
         }
     }
-}
 
-// ResourceInfo::Release implementation
-void ResourceInfo::Release()
-{
-    int prev = UseCount.fetch_sub(1, std::memory_order_acq_rel);
-    if (prev <= 1)
+    // ResourceInfo::Release implementation
+    void ResourceInfo::Release()
     {
-        // no more users -> request unload
-        ResourceManager::ReleaseResourceById(ID);
+        int prev = UseCount.fetch_sub(1, std::memory_order_acq_rel);
+        if (prev <= 1)
+        {
+            // no more users -> request unload
+            ResourceManager::ReleaseResourceById(ID);
+        }
     }
 }
 

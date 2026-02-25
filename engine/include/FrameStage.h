@@ -85,6 +85,7 @@ static FrameStage GetNextStage(FrameStage state)
     case FrameStage::Draw: return FrameStage::Present;
     case FrameStage::Present: return FrameStage::PostDraw;
     case FrameStage::PostDraw: return FrameStage::FrameTail;
+    case FrameStage::FrameTail: return FrameStage::FrameHead;
     default: return FrameStage::None;
     }
 }
