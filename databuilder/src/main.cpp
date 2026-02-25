@@ -32,6 +32,14 @@ int main()
 
         binary.clear();
 
+        bool spawnable = false;
+
+        auto info = prefab.FindMember("info");
+        if (info == prefab.MemberEnd() || !info->value.IsObject())
+        {
+ 
+        }
+
         auto entityList = prefab.FindMember("Entities");
         if (entityList == prefab.MemberEnd() || !entityList->value.IsArray())
         {
