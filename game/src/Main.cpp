@@ -224,6 +224,7 @@ int main()
 
         FrameStartTime.store(GetTime());
         TaskManager::TickFrame();
+        EntitySystem::FlushMorgue();
         LastFrameTime = GetTime() - FrameStartTime;
         FameTimeTracker.AddValue(float(LastFrameTime));
 

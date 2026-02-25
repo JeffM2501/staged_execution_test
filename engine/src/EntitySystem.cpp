@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <map>
 #include <set>
 #include <span>
 
@@ -16,6 +17,9 @@ namespace EntitySystem
     static std::unordered_map<size_t, std::unique_ptr<IComponentTable>> ComponentTables;
     size_t NextEntityId = 1;
 
+    std::mutex ReusableEntityIDsLock;
+    std::vector<size_t> ReusableEntityIDs;
+
     struct EntityInfo
     {
         bool Awake = false;
@@ -23,15 +27,27 @@ namespace EntitySystem
     };
 
     std::recursive_mutex EntityInfoLock;
-    static std::unordered_map<size_t, EntityInfo> EntityInfoCache;
+    static std::map<size_t, EntityInfo> EntityInfoCache;
 
     void Init()
     {
-        TaskManager::AddTaskOnState<LambdaTask>(FrameStage::FrameTail, Hashes::CRC64Str("FlushEntities"), []() { EntitySystem::FlushMorgue(); }, true);
+    }
+
+    void ReleaseEntityId(size_t id)
+    {
+        std::lock_guard<std::mutex> lock(ReusableEntityIDsLock);
+        ReusableEntityIDs.push_back(id);
     }
 
     size_t NewEntityId()
     {
+        std::lock_guard<std::mutex> lock(ReusableEntityIDsLock);
+        if (!ReusableEntityIDs.empty())
+        {
+            size_t id = ReusableEntityIDs.back();
+            ReusableEntityIDs.pop_back();
+            return id;
+        }
         return NextEntityId++;
     }
 
@@ -77,10 +93,17 @@ namespace EntitySystem
 
     void RemoveEntity(size_t entityId)
     {
-        EnableEntity(entityId, false);
+        {
+            std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+            auto itr = EntityInfoCache.find(entityId);
+            if (itr != EntityInfoCache.end())
+                EntityInfoCache.erase(itr);
+        }
 
-        std::lock_guard<std::recursive_mutex> lock(MorgueLock);
-        EntityMorgue.insert(entityId);
+        {
+            std::lock_guard<std::recursive_mutex> lock(MorgueLock);
+            EntityMorgue.insert(entityId);
+        }
     }
 
     void AwakeAllEntities()
@@ -135,15 +158,15 @@ namespace EntitySystem
     void FlushMorgue()
     {
         std::lock_guard<std::recursive_mutex> lock(MorgueLock);
-        std::lock_guard<std::recursive_mutex> infoLock(EntityInfoLock);
+ 
         for (size_t entityId : EntityMorgue)
         {
+            ReleaseEntityId(entityId);
+
             for (auto& [componentType, table] : ComponentTables)
             {
                 table->Remove(entityId);
             }
-
-            EntityInfoCache.erase(entityId);
         }
 
         EntityMorgue.clear();
