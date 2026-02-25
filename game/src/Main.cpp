@@ -81,7 +81,7 @@ void SetupScene()
 
     constexpr float nonPlayerSize = 20;
     constexpr float nonPlayerSpeed = 50;
-    constexpr size_t npcCount = 200;
+    constexpr size_t npcCount = 2;
 
     for (size_t i = 0; i < npcCount; i++)
     {
@@ -139,6 +139,8 @@ protected:
             transform->Position.y = buffer.Read<float>();
             transform->Velocity.x = buffer.Read<float>();
             transform->Velocity.y = buffer.Read<float>();
+
+            TraceLog(LOG_INFO, "Loaded Transform for entity %zu", component->EntityID);
         }
         else if (componentId == PlayerComponent::GetComponentId())
         {
@@ -147,6 +149,7 @@ protected:
             player->Health = buffer.Read<float>();
             player->PlayerSpeed = buffer.Read<float>();
             player->ReloadTime = buffer.Read<float>();
+            TraceLog(LOG_INFO, "Loaded PlayerComponent for entity %zu", component->EntityID);
         }
     }
 };

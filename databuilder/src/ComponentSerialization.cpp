@@ -39,19 +39,19 @@ namespace ComponentSerialization
         float reloadTime = 0;
 
         auto sizeIt = j.FindMember("Size");
-        if (sizeIt != j.MemberEnd() && sizeIt->value.IsFloat())
+        if (sizeIt != j.MemberEnd() && sizeIt->value.IsNumber())
             size = sizeIt->value.GetFloat();
 
         auto healthIt = j.FindMember("Health");
-        if (healthIt != j.MemberEnd() && healthIt->value.IsFloat())
+        if (healthIt != j.MemberEnd() && healthIt->value.IsNumber())
             health = healthIt->value.GetFloat();
 
         auto speedIt = j.FindMember("PlayerSpeed");
-        if (speedIt != j.MemberEnd() && speedIt->value.IsFloat())
+        if (speedIt != j.MemberEnd() && speedIt->value.IsNumber())
             playerSpeed = speedIt->value.GetFloat();
 
         auto reloadIt = j.FindMember("ReloadTime");
-        if (reloadIt != j.MemberEnd() && reloadIt->value.IsFloat())
+        if (reloadIt != j.MemberEnd() && reloadIt->value.IsNumber())
             reloadTime = reloadIt->value.GetFloat();
 
         WriteToOut(size, out);

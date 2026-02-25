@@ -8,8 +8,10 @@ namespace EntityReader
     void Reader::ReadEntitiesFromResource(size_t resourceHash)
     {
         using namespace ResourceManager;
-        auto parseFile = [this](const ResourceInfoRef& resource)
+        auto parseFile = [this, resourceHash](const ResourceInfoRef& resource)
             {
+                TraceLog(LOG_INFO, "Loaded Entity Resource %zu", resourceHash);
+
                 std::lock_guard<std::mutex> lock(resource->Lock);
                 const auto& dataVariant = resource->Data;
                 if (!std::holds_alternative<std::vector<unsigned char>>(dataVariant))
@@ -25,9 +27,10 @@ namespace EntityReader
                     size_t realEnityId = static_cast<size_t>(entityId);
                     if (entityId <= 0)
                         realEnityId = EntitySystem::NewEntityId();
-      
+
                     uint32_t componentCount = reader.Read<uint32_t>();
-                
+                    TraceLog(LOG_INFO, "Loaded Entity %zu with %d components from resource %zu", realEnityId, componentCount, resourceHash);
+
                     createdEntities.insert(realEnityId);
                     for (size_t i = 0; i < componentCount; ++i)
                     {
@@ -43,8 +46,14 @@ namespace EntityReader
                         }
                     }
                 }
-            };
 
+                for (auto entityId : createdEntities)
+                {
+                    TraceLog(LOG_INFO, "Waking Created Entity %zu", entityId);
+                    EntitySystem::AwakeEntity(entityId);
+                }
+            };
+        TraceLog(LOG_INFO, "Loading Entity Resource %zu", resourceHash);
         LoadResource(resourceHash, ResourceType::File, parseFile);
     }
 }
