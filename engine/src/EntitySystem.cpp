@@ -1,13 +1,10 @@
 #include "EntitySystem.h"
-#include "TaskManager.h"
-#include "FrameStage.h"
-#include "ResourceManager.h"
 
 #include <memory>
 #include <unordered_map>
 #include <map>
 #include <set>
-#include <span>
+#include <functional>
 
 namespace EntitySystem
 {
@@ -35,6 +32,7 @@ namespace EntitySystem
 
     void ReleaseEntityId(size_t id)
     {
+        TraceLog(LOG_INFO, "Released Entity %zu", id);
         std::lock_guard<std::mutex> lock(ReusableEntityIDsLock);
         ReusableEntityIDs.push_back(id);
     }
@@ -46,6 +44,7 @@ namespace EntitySystem
         {
             size_t id = ReusableEntityIDs.back();
             ReusableEntityIDs.pop_back();
+            TraceLog(LOG_INFO, "Reused Entity %zu", id);
             return id;
         }
         return NextEntityId++;
@@ -101,8 +100,10 @@ namespace EntitySystem
         }
 
         {
+            TraceLog(LOG_INFO, "Placing Entity %zu in morgue", entityId);
             std::lock_guard<std::recursive_mutex> lock(MorgueLock);
             EntityMorgue.insert(entityId);
+
         }
     }
 
@@ -113,6 +114,8 @@ namespace EntitySystem
         {
             info.Awake = true;
         }
+
+        TraceLog(LOG_INFO, "Awake All Entities");
     }
 
     bool IsEntityReady(size_t entityId)
@@ -143,6 +146,8 @@ namespace EntitySystem
         auto itr = EntityInfoCache.find(entityId);
         if (itr != EntityInfoCache.end())
             itr->second.Awake = true;
+
+        TraceLog(LOG_INFO, "Awake Entity %zu", entityId);
     }
 
     void ClearAllEntities()

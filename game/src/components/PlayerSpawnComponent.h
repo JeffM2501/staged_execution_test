@@ -4,9 +4,9 @@
 
 #include "EntitySystem.h"
 
-struct NPCComponent : public EntitySystem::EntityComponent
+struct PlayerSpawnComponent : public EntitySystem::EntityComponent
 {
-    DECLARE_SIMPLE_COMPONENT(NPCComponent);
+    DECLARE_SIMPLE_COMPONENT(PlayerSpawnComponent);
 
     float Size = 20;
     Color Tint = BLUE;

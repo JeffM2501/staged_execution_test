@@ -9,6 +9,9 @@
 
 namespace fs = std::filesystem;
 
+static constexpr uint32_t Magic = 0x50465242; // "PFRB" in ASCII
+static constexpr uint32_t Version = 1;
+
 int main()
 {
     std::string inputFolder = "assets";
@@ -32,13 +35,20 @@ int main()
 
         binary.clear();
 
-        bool spawnable = false;
+        int spawnable = 0;
 
-        auto info = prefab.FindMember("info");
-        if (info == prefab.MemberEnd() || !info->value.IsObject())
+        auto info = prefab.FindMember("Info");
+        if (info != prefab.MemberEnd() && info->value.IsObject())
         {
- 
+            auto spawnableIt = info->value.FindMember("spawnable");
+            if (spawnableIt != prefab.MemberEnd() && spawnableIt->value.IsBool())
+                spawnable = spawnableIt->value.GetBool() ? 1 : 0;
         }
+
+        // header
+        WriteToOut(Magic, binary);
+        WriteToOut(Version, binary);
+        WriteToOut(spawnable, binary);
 
         auto entityList = prefab.FindMember("Entities");
         if (entityList == prefab.MemberEnd() || !entityList->value.IsArray())

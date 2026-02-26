@@ -194,7 +194,6 @@ double GetFrameStartTime()
 }
 
 /* TODO
-* Add Entity Loading from resource
 * Add Entity group tracking for loaded resources
 */
 

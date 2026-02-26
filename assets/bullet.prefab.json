@@ -5,17 +5,17 @@
   "Entities": [
     {
       "ID": -1,
-      "Name": "Player",
+      "Name": "Bullet",
       "Components": {
         "TransformComponent": {
           "Position": [ 0, 0 ],
           "Velocity": [ 0, 0 ]
         },
-        "PlayerComponent": {
-          "Size": 10,
-          "Health": 100.0,
-          "PlayerSpeed": 100,
-          "Reloadtime": 0.25
+        "BulletComponent": {
+          "Size": 4,
+          "Damage": 10.0,
+          "Lifetime": 3.0,
+          "Tint" : [ 255, 255, 0, 255 ]
         }
       }
     }

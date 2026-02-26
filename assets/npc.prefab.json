@@ -5,18 +5,15 @@
   "Entities": [
     {
       "ID": -1,
-      "Name": "Player",
+      "Name": "NPC",
       "Components": {
         "TransformComponent": {
           "Position": [ 0, 0 ],
           "Velocity": [ 0, 0 ]
         },
-        "PlayerComponent": {
-          "Size": 10,
-          "Health": 100.0,
-          "PlayerSpeed": 100,
-          "Reloadtime": 0.25
-        }
+        "NPCComponent": {
+          "Size": 20,
+          "Tint" : [ 0, 82, 172, 255 ]
       }
     }
   ],
