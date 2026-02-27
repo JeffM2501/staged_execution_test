@@ -2,18 +2,14 @@
 
 #include <vector>
 #include <string>
+#include <span>
 #include <cstdint>
 #include <rapidjson/document.h>
 
 // Serialization interface for components
 namespace ComponentSerialization
 {
-    // Serialize TransformComponent from RapidJSON to binary
-    void SerializeTransform(const rapidjson::Value& j, std::vector<uint8_t>& out);
-
-    // Serialize PlayerComponent from RapidJSON to binary
-    void SerializePlayer(const rapidjson::Value& j, std::vector<uint8_t>& out);
-
+    void SetupSerializers();
     // General dispatcher for serialization by component type name
     void Serialize(const std::string& type, const rapidjson::Value& j, std::vector<uint8_t>& out);
 }
@@ -24,4 +20,11 @@ inline void WriteToOut(const T& value, std::vector<uint8_t>& out)
     out.insert(out.end(),
         reinterpret_cast<const uint8_t*>(&value),
         reinterpret_cast<const uint8_t*>(&value) + sizeof(T));
+}
+
+template<>
+inline void WriteToOut(const std::span<uint8_t> & value, std::vector<uint8_t>& out)
+{
+    for (auto c : value)
+        WriteToOut(value, out);
 }

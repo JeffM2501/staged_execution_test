@@ -14,13 +14,15 @@ static constexpr uint32_t Version = 1;
 
 int main()
 {
+    ComponentSerialization::SetupSerializers();
+
     std::string inputFolder = "assets";
     std::string outputFolder = "resources/files";
 
-    std::vector<uint8_t> binary;
-
     for (const auto& entry : fs::directory_iterator(inputFolder))
     {
+        std::vector<uint8_t> binary;
+
         if (!entry.is_regular_file())
             continue;
 
@@ -31,7 +33,11 @@ int main()
         std::ifstream in(path);
         std::string jsonStr((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         rapidjson::Document prefab;
-        prefab.Parse(jsonStr.c_str());
+        if (prefab.Parse(jsonStr.c_str()).HasParseError())
+        {
+            std::cerr << "Failed to parse JSON file: " << path << std::endl;
+            continue;
+        }
 
         binary.clear();
 
@@ -98,7 +104,10 @@ int main()
             }
         }
 
-        std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(path.stem().string())) + ".bin";
+        std::string hashedName = path.stem().string();
+        hashedName += hashedName.substr(inputFolder.size() + 1);
+
+        std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
         std::ofstream out(outputPath, std::ios::binary);
         out.write(reinterpret_cast<const char*>(binary.data()), binary.size());
         out.close();

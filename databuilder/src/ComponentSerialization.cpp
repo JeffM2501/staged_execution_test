@@ -1,71 +1,146 @@
 #include "ComponentSerialization.h"
 
+#include "rapidjson/rapidjson.h"
+
+#include <unordered_map>
+#include <functional>
+
 namespace ComponentSerialization
 {
-    void SerializeTransform(const rapidjson::Value& j, std::vector<uint8_t>& out)
+
+    bool ReadColor(uint8_t color[4], const rapidjson::Value& colorValue)
     {
-        float position[2] = { 0,0 };
-        float velocity[2] = { 0,0 };
-        auto pos = j.FindMember("Position");
-        if (pos != j.MemberEnd() && pos->value.IsArray())
+        if (colorValue.IsArray())
         {
-            const auto& posArray = pos->value;
-            for (rapidjson::SizeType i = 0; i < posArray.Size() && i < 2; ++i)
+            const auto& colorArray = colorValue;
+            for (rapidjson::SizeType i = 0; i < colorArray.Size() && i < 4; ++i)
             {
-                if (posArray[i].IsFloat())
-                    position[i] = posArray[i].GetFloat();
+                if (colorArray[i].IsUint())
+                    color[i] = static_cast<uint8_t>(colorArray[i].GetUint());
+            }
+            return true;
+        }
+        return false;
+    }
+
+    template<typename T>
+    bool ReadValueNumber(std::string_view name, T& out, const rapidjson::Value& value)
+    {
+        auto it = value.FindMember(name.data());
+        if (it != value.MemberEnd() && it->value.IsNumber())
+        {
+            out = static_cast<T>(it->value.Get<T>());
+            return true;
+        }
+        return false;
+    }
+
+    template<typename T>
+    bool ReadValueNumberArray(std::string_view name, std::span<T> out, const rapidjson::Value& value)
+    {
+        auto it = value.FindMember(name.data());
+        if (it != value.MemberEnd() && it->value.IsArray())
+        {
+            const auto& valueArray = it->value;
+            for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < out.size(); ++i)
+            {
+                if (valueArray[i].IsNumber())
+                    out[i] = valueArray[i].Get<T>();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    template<typename T>
+    void SerializeNumber(std::string_view name, T defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
+    {
+        T binValue = defaultValue;
+        ReadValueNumber(name, binValue, value);
+        WriteToOut(binValue, out);
+    }
+
+    template<typename T>
+    void SerializeNumberArray(std::string_view name, const std::vector<T>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
+    {
+        // Make a mutable copy initialized from the provided default.
+        std::vector<T> binValue = defaultValue;
+
+        // Create a span over the vector so ReadValueNumberArray can fill it.
+        std::span<T> binSpan(binValue);
+
+        // Read values from JSON into our span (will overwrite elements up to span.size()).
+        ReadValueNumberArray<T>(name, binSpan, value);
+
+        // Serialize the resulting numeric array to output.
+        WriteToOut(binValue, out);
+    }
+
+
+    void SerializeColor(std::string_view name, const std::vector<uint8_t>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
+    {
+        // Make a mutable copy initialized from the provided default.
+        std::vector<uint8_t> binValue = defaultValue;
+
+        auto it = value.FindMember(name.data());
+        if (it != value.MemberEnd() && it->value.IsArray())
+        {
+            const auto& valueArray = it->value;
+            for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < out.size(); ++i)
+            {
+                if (valueArray[i].IsNumber())
+                    binValue[i] = uint8_t(valueArray[i].GetUint());
             }
         }
 
-        auto vel = j.FindMember("Velocity");
-        if (vel != j.MemberEnd() && vel->value.IsArray())
-        {
-            const auto& velArray = vel->value;
-            for (rapidjson::SizeType i = 0; i < velArray.Size() && i < 2; ++i)
-            {
-                if (velArray[i].IsFloat())
-                    velocity[i] = velArray[i].GetFloat();
-            }
-        }
-        WriteToOut(position, out);
-        WriteToOut(velocity, out);
+        // Serialize the resulting numeric array to output.
+        WriteToOut(binValue, out);
+    }
+
+
+    void SerializeTransform(const rapidjson::Value& j, std::vector<uint8_t>& out)
+    {
+        SerializeNumberArray<float>("Position", { 0,0 }, j, out);
+        SerializeNumberArray<float>("Velocity", { 0,0 }, j, out);
     }
 
     void SerializePlayer(const rapidjson::Value& j, std::vector<uint8_t>& out)
     {
-        float size = 0;
-        float health = 0;
-        float playerSpeed = 0;
-        float reloadTime = 0;
+        SerializeNumber("Size", 10.0f, j, out);
+        SerializeNumber("Health", 100.0f, j, out);
+        SerializeNumber("PlayerSpeed", 100.0f, j, out);
+        SerializeNumber("ReloadTime", 0.25f, j, out);
+    }
 
-        auto sizeIt = j.FindMember("Size");
-        if (sizeIt != j.MemberEnd() && sizeIt->value.IsNumber())
-            size = sizeIt->value.GetFloat();
+    void SerializeNPC(const rapidjson::Value& j, std::vector<uint8_t>& out)
+    {
+        SerializeNumber("Size", 20.0f, j, out);
+        SerializeColor("Tint", { 0,0,255,255 }, j, out);
+    }
 
-        auto healthIt = j.FindMember("Health");
-        if (healthIt != j.MemberEnd() && healthIt->value.IsNumber())
-            health = healthIt->value.GetFloat();
+    void SerializeBullet(const rapidjson::Value& j, std::vector<uint8_t>& out)
+    {
+        SerializeNumber("Size", 4.0f, j, out);
+        SerializeNumber("Damage", 10.0f, j, out);
+        SerializeNumber("Lifetime", 1.0f, j, out);
+        SerializeColor("Tint", { 255,255,0,255 }, j, out);
+    }
 
-        auto speedIt = j.FindMember("PlayerSpeed");
-        if (speedIt != j.MemberEnd() && speedIt->value.IsNumber())
-            playerSpeed = speedIt->value.GetFloat();
-
-        auto reloadIt = j.FindMember("ReloadTime");
-        if (reloadIt != j.MemberEnd() && reloadIt->value.IsNumber())
-            reloadTime = reloadIt->value.GetFloat();
-
-        WriteToOut(size, out);
-        WriteToOut(health, out);
-        WriteToOut(playerSpeed, out);
-        WriteToOut(reloadTime, out);
+    std::unordered_map<std::string, std::function<void(const rapidjson::Value&, std::vector<uint8_t>&)>> Serializers;
+    void SetupSerializers()
+    {
+        Serializers["TransformComponent"] = SerializeTransform;
+        Serializers["PlayerComponent"] = SerializePlayer;
+        Serializers["NPCComponent"] = SerializeNPC;
+        Serializers["BulletComponent"] = SerializeBullet;
     }
 
     void Serialize(const std::string& type, const rapidjson::Value& j, std::vector<uint8_t>& out)
     {
-        if (type == "TransformComponent")
-            SerializeTransform(j, out);
-        else if (type == "PlayerComponent")
-            SerializePlayer(j, out);
-        // Add more component types as needed
+        auto itr = Serializers.find(type);
+        if (itr != Serializers.end())
+        {
+            itr->second(j, out);
+        }
     }
 }

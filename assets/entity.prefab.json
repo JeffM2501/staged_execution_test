@@ -15,7 +15,7 @@
           "Size": 10,
           "Health": 100.0,
           "PlayerSpeed": 100,
-          "Reloadtime": 0.25
+          "Reloadtime": 0.015
         }
       }
     }
