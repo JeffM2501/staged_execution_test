@@ -34,6 +34,13 @@ namespace EntityReader
             return value;
         }
 
+        template<>
+        Color Read()
+        {
+            Color c = { Read<uint8_t>(), Read<uint8_t>(), Read<uint8_t>(), Read<uint8_t>() };
+            return c;
+        };
+
         BufferReader ReadBuffer(size_t length)
         {
             if (m_offset + length > m_buffer.size())

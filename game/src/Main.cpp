@@ -143,7 +143,26 @@ protected:
             player->Health = buffer.Read<float>();
             player->PlayerSpeed = buffer.Read<float>();
             player->ReloadTime = buffer.Read<float>();
+
             TraceLog(LOG_INFO, "Loaded PlayerComponent for entity %zu", component->EntityID);
+        }
+        else if (componentId == NPCComponent::GetComponentId())
+        {
+            auto npc = static_cast<NPCComponent*>(component);
+            npc->Size = buffer.Read<float>();
+            npc->Tint = buffer.Read<Color>();
+
+            TraceLog(LOG_INFO, "Loaded NPCComponent for entity %zu", component->EntityID);
+        }
+        else if (componentId == BulletComponent::GetComponentId())
+        {
+            auto bullet = static_cast<BulletComponent*>(component);
+            bullet->Size = buffer.Read<float>();
+            bullet->Damage = buffer.Read<float>();
+            bullet->Lifetime = buffer.Read<float>();
+            bullet->Tint = buffer.Read<Color>();
+
+            TraceLog(LOG_INFO, "Loaded BulletComponent for entity %zu", component->EntityID);
         }
     }
 };
@@ -169,7 +188,7 @@ void GameInit()
     RegisterTasks();
     RegisterComponents();
 
-    Reader.ReadEntitiesFromResource(12975522424435480105);
+    Reader.ReadEntitiesFromResource(6365428038355519192);
 
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
 
@@ -195,6 +214,7 @@ double GetFrameStartTime()
 
 /* TODO
 * Add Entity group tracking for loaded resources
+* Resource Manager preloads
 */
 
 int main()

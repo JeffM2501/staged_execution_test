@@ -22,9 +22,14 @@ inline void WriteToOut(const T& value, std::vector<uint8_t>& out)
         reinterpret_cast<const uint8_t*>(&value) + sizeof(T));
 }
 
-template<>
-inline void WriteToOut(const std::span<uint8_t> & value, std::vector<uint8_t>& out)
+template<typename T>
+inline void WriteArrayToOut(const std::span<T> & value, std::vector<uint8_t>& out)
 {
     for (auto c : value)
-        WriteToOut(value, out);
+    {
+        out.insert(out.end(),
+            reinterpret_cast<const uint8_t*>(&c),
+            reinterpret_cast<const uint8_t*>(&c) + sizeof(T));
+    }
 }
+

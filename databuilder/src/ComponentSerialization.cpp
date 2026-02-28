@@ -73,7 +73,7 @@ namespace ComponentSerialization
         ReadValueNumberArray<T>(name, binSpan, value);
 
         // Serialize the resulting numeric array to output.
-        WriteToOut(binValue, out);
+        WriteArrayToOut<T>(binValue, out);
     }
 
 
@@ -94,7 +94,7 @@ namespace ComponentSerialization
         }
 
         // Serialize the resulting numeric array to output.
-        WriteToOut(binValue, out);
+        WriteArrayToOut<uint8_t>(binValue, out);
     }
 
 
