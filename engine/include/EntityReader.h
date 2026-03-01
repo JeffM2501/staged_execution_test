@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <span>
 #include <cstdint>
 #include <cstring>
@@ -82,10 +83,18 @@ namespace EntityReader
         // For each component, the buffer is passed to OnComponentData for initialization.
         void ReadEntitiesFromResource(size_t resourceHash, OnEntityReadCallback onReadComplete = nullptr);
 
+        // Reads entities and components from a resource file (ResourceManager).
+        // Each entity is created with the ID from the file, and components are added by component ID.
+        // For each component, the buffer is passed to OnComponentData for initialization.
+        void ReadSceneFromResource(size_t resourceHash, OnEntityReadCallback onReadComplete = nullptr);
+
     protected:
         // Called for each created component, passing the buffer with component data.
         // Override this in derived classes to handle component-specific deserialization.
         virtual void OnComponentData(EntitySystem::EntityComponent* component, size_t componentId, BufferReader& buffer) = 0;
+
+    private:
+        std::vector<size_t> ReadEntities(BufferReader& reader);
     };
 
 }

@@ -78,6 +78,8 @@ namespace EntitySystem
         virtual EntityComponent* TryGet(size_t id) = 0;
         virtual void Clear() = 0;
 
+        virtual size_t Size() const = 0;
+
         virtual size_t GetComponentType() const = 0;
 
         virtual void DoForEach(std::function<void(EntityComponent&)> func, bool paralel = false, bool enabledOnly = true) = 0;
@@ -148,6 +150,11 @@ namespace EntitySystem
             }
             Components.clear();
             ComponentsByID.clear();
+        }
+        
+        size_t Size() const override
+        {
+            return Components.size();
         }
 
         bool HasEntity(size_t id) override

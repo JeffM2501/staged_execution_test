@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <algorithm>
 #include <rapidjson/document.h>
 #include "ComponentSerialization.h"
 #include "CRC64.h"
@@ -175,6 +176,8 @@ void SerailizeScene(std::filesystem::path path)
 
     std::string hashedName = path.string();
     hashedName = hashedName.substr(inputFolder.size() + 1);
+
+    std::replace(hashedName.begin(), hashedName.end(), '\\', '/'); 
 
     std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
     std::ofstream out(outputPath, std::ios::binary);

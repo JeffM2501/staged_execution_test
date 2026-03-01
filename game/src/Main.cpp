@@ -18,6 +18,8 @@
 #include "components/PlayerComponent.h"
 #include "components/NPCComponent.h"
 #include "components/BulletComponent.h"
+#include "components/PlayerSpawnComponent.h"
+#include "components/NPCSpawnComponent.h"
 
 #include "ComponentReader.h"
 
@@ -64,34 +66,13 @@ Vector2 GetRandomPosInBounds(const BoundingBox2D & bounds, float size)
     return Vector2(x, y);
 }
 
-Vector2 GetRandomVector(float scaler = 1)
+Vector2 GetRandomVector(float scaler)
 {
     constexpr int resolution = 90000;
     float x = float(GetRandomValue(-resolution, resolution));
     float y = float(GetRandomValue(-resolution, resolution));
 
     return Vector2Normalize(Vector2(x, y)) * scaler;
-}
-
-void SetupScene()
-{
-    constexpr float nonPlayerSize = 20;
-    constexpr float nonPlayerSpeed = 50;
-    constexpr size_t npcCount = 200;
-
-    for (size_t i = 0; i < npcCount; i++)
-    {
-        auto npc = EntitySystem::AddComponent<NPCComponent>(EntitySystem::NewEntityId());
-        npc->Size = float(GetRandomValue(5, 15));
-        npc->Tint = GetRandomValue(0, 10) >= 5 ? DARKBLUE : DARKPURPLE;
-        auto transform = npc->AddComponent<TransformComponent>();
-        transform->Position = GetRandomPosInBounds(WorldBounds, nonPlayerSize);
-        transform->Velocity = GetRandomVector(float(GetRandomValue(int(nonPlayerSpeed / 2), int(nonPlayerSpeed))));
-    }
-
-    // pretend like loading takes time
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    EntitySystem::AwakeAllEntities();
 }
 
 // setup
@@ -109,6 +90,8 @@ void RegisterComponents()
     RegisterComponentWithUpdate<PlayerComponent>(FrameStage::Update, true);
     RegisterComponentWithUpdate<NPCComponent>(FrameStage::FixedUpdate, true);
     RegisterComponentWithUpdate<BulletComponent>(FrameStage::PreUpdate, true);
+    RegisterComponentWithUpdate<NPCSpawnComponent>(FrameStage::FixedUpdate, true);
+    EntitySystem::RegisterComponent<PlayerSpawnComponent>();
 }
 
 void RegisterLayers()
@@ -123,6 +106,7 @@ void RegisterLayers()
 }
 
 ComponentReader PrefabReader;
+ComponentReader SceneReader;
 
 void GameInit()
 {
@@ -143,15 +127,9 @@ void GameInit()
     RegisterTasks();
     RegisterComponents();
 
-    PrefabReader.ReadEntitiesFromResource(Hashes::CRC64Str("entity.prefab.json"), [](std::span<size_t> entities)
-        {
-            EntitySystem::GetEntityComponent<TransformComponent>(entities[0])->Position = { 300,300 };
-        });
+    SceneReader.ReadSceneFromResource(Hashes::CRC64Str("levels/test.scene.json"));
 
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
-
-    LoaderTask = std::make_unique<LambdaTask>(Hashes::CRC64Str("loader"), []() {SetupScene(); }, false);
-    TaskManager::RunOneShotTask(LoaderTask.get());
 }
 
 void GameCleanup()

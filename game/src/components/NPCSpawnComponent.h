@@ -12,11 +12,14 @@ struct NPCSpawnComponent : public EntitySystem::EntityComponent
     float MinVelocity = 20.0f;
     float MaxVelocity = 100.0f;
 
-    float MaxSpawnCount = 200.0f;
+    size_t MaxSpawnCount = 200;
 
     size_t NPCPrefab = 0;
 
     double LastUpdateTime = 0;
+    float NextSpawnInterval = 0;
+
+    void OnAwake() override;
 
     void Update();
 };

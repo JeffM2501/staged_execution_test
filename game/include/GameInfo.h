@@ -32,3 +32,6 @@ extern double LastFrameTime;
 extern ValueTracker FameTimeTracker;
 
 extern ComponentReader PrefabReader;
+
+Vector2 GetRandomPosInBounds(const BoundingBox2D& bounds, float size);
+Vector2 GetRandomVector(float scaler = 1);
