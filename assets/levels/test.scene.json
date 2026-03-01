@@ -1,0 +1,40 @@
+{
+  "PrefabPreloads": [
+    "entity.prefab.json",
+    "npc.prefab.json"
+  ],
+  "Entities": [
+    {
+      "ID": -1,
+      "Name": "PlayerSpawn",
+      "Components": {
+        "TransformComponent": {
+          "Position": [ 100, 200 ]
+        },
+        "PlayerSpawnComponent": {
+          "PlayerPrefab": "entity.prefab.json"
+        }
+      }
+    },
+    {
+      "ID": -2,
+      "Name": "NPCSpawn",
+      "Components": {
+        "TransformComponent": {
+          "Position": [ 600, 600 ]
+        },
+        "NPCSpawnComponent": {
+          "NPCPrefab": "npc.prefab.json",
+          "Interval": [ 1, 3 ],
+          "Velocity": [ 20, 100 ],
+          "MaxSpawnCount": 100
+        }
+      }
+    }
+  ],
+  "Meta": {
+    "version": "1.0",
+    "createdBy": "staged_execution_test",
+    "timestamp": "2026-02-23T00:00:00Z"
+  }
+}

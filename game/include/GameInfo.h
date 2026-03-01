@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "ValueTracker.h"
+#include "ComponentReader.h"
 
 #include <atomic>
 
@@ -29,3 +30,5 @@ extern size_t DebugLayer ;
 extern double LastFrameTime;
 
 extern ValueTracker FameTimeTracker;
+
+extern ComponentReader PrefabReader;

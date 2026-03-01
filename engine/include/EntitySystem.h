@@ -45,6 +45,11 @@ namespace EntitySystem
         virtual ~EntityComponent() = default;
         virtual size_t ComponentId() const = 0;
 
+        virtual void OnAwake() {}
+        virtual void OnEnabled() {}
+        virtual void OnDisabled() {}
+        virtual void OnDestroy() {}
+
         template<class T>
         T* AddComponent()
         {
@@ -137,6 +142,10 @@ namespace EntitySystem
         void Clear() override
         {
             std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
+            for (auto& component : Components)
+            {
+                component.OnDestroy();
+            }
             Components.clear();
             ComponentsByID.clear();
         }
@@ -214,6 +223,8 @@ namespace EntitySystem
         }, paralel, enabledOnly);
     }
 
+    void DoForeachComponentOfEntity(size_t entityId, std::function<void(EntityComponent&)> func);
+
     bool EntityHasComponent(size_t entityId, size_t componentType);
 
     template<class T>
@@ -278,6 +289,8 @@ namespace EntitySystem
     void AwakeAllEntities();
 
     void RemoveEntity(size_t entityId);
+
+    bool EntityExists(size_t entityId);
 
     void ClearAllEntities();
 

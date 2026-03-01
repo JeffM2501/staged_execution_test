@@ -15,7 +15,8 @@
           "Size": 10,
           "Health": 100.0,
           "PlayerSpeed": 100,
-          "Reloadtime": 0.015
+          "ReloadTime": 0.015,
+          "BulletPrefab": "bullet.prefab.json"
         }
       }
     }

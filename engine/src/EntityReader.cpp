@@ -10,23 +10,30 @@ namespace EntityReader
     static constexpr uint32_t Version = 1;
 
 
-    void Reader::ReadEntitiesFromResource(size_t resourceHash)
+    void Reader::ReadEntitiesFromResource(size_t resourceHash, OnEntityReadCallback onReadComplete)
     {
         using namespace ResourceManager;
-        auto parseFile = [this, resourceHash](const ResourceInfoRef& resource)
+        auto parseFile = [this, resourceHash, onReadComplete](const ResourceInfoRef& resource)
             {
-                TraceLog(LOG_INFO, "Loaded Entity Resource %zu", resourceHash);
+                TraceLog(LOG_INFO, "Loading Entity Resource %zu", resourceHash);
 
                 uint32_t spawnable = 0;
                 {
                     std::lock_guard<std::mutex> lock(resource->Lock);
                     const auto& dataVariant = resource->Data;
                     if (!std::holds_alternative<std::vector<unsigned char>>(dataVariant))
-                        return;
+                    {
+                        TraceLog(LOG_INFO, "Entity Resource %zu Invalid", resourceHash);
+                    }
 
-                    std::set<size_t> createdEntities;
+                    std::vector<size_t> createdEntities;
 
                     BufferReader reader(std::get<std::vector<unsigned char>>(dataVariant));
+
+                    if (reader.Size() < sizeof(uint32_t) * 3)   
+                    {
+                        TraceLog(LOG_INFO, "Entity Resource %zu Incorrect Size", resourceHash);
+                    }
 
                     auto magic = reader.Read<uint32_t>(); // magic
                     auto version = reader.Read<uint32_t>(); // version
@@ -39,13 +46,13 @@ namespace EntityReader
                             int64_t entityId = reader.Read<int64_t>();
 
                             size_t realEnityId = static_cast<size_t>(entityId);
-                            if (entityId <= 0)
+                            if (entityId <= 0 || EntitySystem::EntityExists(entityId))
                                 realEnityId = EntitySystem::NewEntityId();
 
                             uint32_t componentCount = reader.Read<uint32_t>();
                             TraceLog(LOG_INFO, "Loaded Entity %zu with %d components from resource %zu", realEnityId, componentCount, resourceHash);
 
-                            createdEntities.insert(realEnityId);
+                            createdEntities.push_back(realEnityId);
                             for (size_t i = 0; i < componentCount; ++i)
                             {
                                 uint64_t componentId = reader.Read<uint64_t>();
@@ -61,6 +68,9 @@ namespace EntityReader
                             }
                         }
                     }
+
+                    if (onReadComplete)
+                        onReadComplete(createdEntities);
 
                     for (auto entityId : createdEntities)
                     {

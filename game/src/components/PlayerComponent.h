@@ -22,5 +22,7 @@ struct PlayerComponent : public EntitySystem::EntityComponent
 
     float ReloadTime = 0.15f;
 
+    size_t BulletPrefab = 0;
+
     void Update();
 };

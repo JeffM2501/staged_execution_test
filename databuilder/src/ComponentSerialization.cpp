@@ -1,5 +1,7 @@
 #include "ComponentSerialization.h"
 
+#include "CRC64.h"
+
 #include "rapidjson/rapidjson.h"
 
 #include <unordered_map>
@@ -76,7 +78,6 @@ namespace ComponentSerialization
         WriteArrayToOut<T>(binValue, out);
     }
 
-
     void SerializeColor(std::string_view name, const std::vector<uint8_t>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
     {
         // Make a mutable copy initialized from the provided default.
@@ -97,6 +98,20 @@ namespace ComponentSerialization
         WriteArrayToOut<uint8_t>(binValue, out);
     }
 
+    void SeralizeAssetReference(std::string_view name, const rapidjson::Value& value, std::vector<uint8_t>& out)
+    {
+        // Make a mutable copy initialized from the provided default.
+       size_t nameValue;
+
+        auto it = value.FindMember(name.data());
+        if (it != value.MemberEnd() && it->value.IsString())
+        {
+            nameValue = Hashes::CRC64Str(it->value.GetString());
+        }
+
+        // Serialize the resulting numeric array to output.
+        WriteToOut<size_t>(nameValue, out);
+    }
 
     void SerializeTransform(const rapidjson::Value& j, std::vector<uint8_t>& out)
     {
@@ -110,6 +125,7 @@ namespace ComponentSerialization
         SerializeNumber("Health", 100.0f, j, out);
         SerializeNumber("PlayerSpeed", 100.0f, j, out);
         SerializeNumber("ReloadTime", 0.25f, j, out);
+        SeralizeAssetReference("BulletPrefab", j, out);
     }
 
     void SerializeNPC(const rapidjson::Value& j, std::vector<uint8_t>& out)
@@ -126,6 +142,19 @@ namespace ComponentSerialization
         SerializeColor("Tint", { 255,255,0,255 }, j, out);
     }
 
+    void SerializePlayerSpawn(const rapidjson::Value& j, std::vector<uint8_t>& out)
+    {
+        SeralizeAssetReference("PlayerPrefab", j, out);
+    }
+
+    void SerializeNPCSpawn(const rapidjson::Value& j, std::vector<uint8_t>& out)
+    {
+        SerializeNumberArray<float>("Interval", { 1, 3 }, j, out);
+        SerializeNumberArray<float>("Velocity", { 20, 100 }, j, out);
+        SerializeNumber<uint32_t>("MaxSpawnCount", 100, j, out);
+        SeralizeAssetReference("NPCPrefab", j, out);
+    }
+
     std::unordered_map<std::string, std::function<void(const rapidjson::Value&, std::vector<uint8_t>&)>> Serializers;
     void SetupSerializers()
     {
@@ -133,6 +162,8 @@ namespace ComponentSerialization
         Serializers["PlayerComponent"] = SerializePlayer;
         Serializers["NPCComponent"] = SerializeNPC;
         Serializers["BulletComponent"] = SerializeBullet;
+        Serializers["PlayerSpawnComponent"] = SerializePlayerSpawn;
+        Serializers["NPCSpawnComponent"] = SerializeNPCSpawn;
     }
 
     void Serialize(const std::string& type, const rapidjson::Value& j, std::vector<uint8_t>& out)

@@ -11,6 +11,8 @@ namespace EntitySystem
     std::recursive_mutex MorgueLock;
 
     std::set<size_t> EntityMorgue;
+
+    std::mutex TableLock;
     static std::unordered_map<size_t, std::unique_ptr<IComponentTable>> ComponentTables;
     size_t NextEntityId = 1;
 
@@ -21,6 +23,7 @@ namespace EntitySystem
     {
         bool Awake = false;
         bool Enabled = true;
+        std::set<size_t> ComponentTypes; // componentType -> index in table
     };
 
     std::recursive_mutex EntityInfoLock;
@@ -52,27 +55,31 @@ namespace EntitySystem
 
     EntityComponent* GetEntityComponent(size_t entityId, size_t componentType)
     {
-        auto itr = ComponentTables.find(componentType);
-        if (itr == ComponentTables.end())
+        IComponentTable* table = GetComponentTable(componentType);
+        if (!table)
             return nullptr;
-        return itr->second->TryGet(entityId);
+
+        return table->TryGet(entityId);
     }
 
     bool EntityHasComponent(size_t entityId, size_t componentType)
     {
-        auto itr = ComponentTables.find(componentType);
-        if (itr == ComponentTables.end())
+        IComponentTable* table = GetComponentTable(componentType);
+        if (!table)
             return false;
-        return itr->second->HasEntity(entityId);
+
+        return table->HasEntity(entityId);
     }
 
     void RegisterComponent(size_t compnentType, std::unique_ptr<IComponentTable> table)
     {
+        std::lock_guard<std::mutex> lock(TableLock);
         ComponentTables.insert_or_assign(compnentType, std::move(table));
     }
 
     IComponentTable* GetComponentTable(size_t componentType)
     {
+       // std::lock_guard<std::mutex> lock(TableLock);
         auto itr = ComponentTables.find(componentType);
         if (itr == ComponentTables.end())
             return nullptr;
@@ -81,13 +88,23 @@ namespace EntitySystem
 
     EntityComponent* AddComponent(size_t entityId, size_t componentType)
     {
-        if (!EntityInfoCache.contains(entityId))
-            EntityInfoCache.insert_or_assign(entityId, EntityInfo());
+        {
+            if (!EntityInfoCache.contains(entityId))
+                EntityInfoCache.insert_or_assign(entityId, EntityInfo());
+        }
 
+        std::lock_guard<std::mutex> lock(TableLock);
         auto itr = ComponentTables.find(componentType);
         if (itr == ComponentTables.end())
             return nullptr;
+        EntityInfoCache[entityId].ComponentTypes.insert(componentType);
         return itr->second->Add(entityId);
+    }
+
+    bool EntityExists(size_t entityId)
+    {
+        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+        return EntityInfoCache.contains(entityId);
     }
 
     void RemoveEntity(size_t entityId)
@@ -113,6 +130,7 @@ namespace EntitySystem
         for (auto& [entity, info] : EntityInfoCache)
         {
             info.Awake = true;
+            DoForeachComponentOfEntity(entity, [](EntityComponent& componnent) { componnent.OnAwake(); });
         }
 
         TraceLog(LOG_INFO, "Awake All Entities");
@@ -138,23 +156,42 @@ namespace EntitySystem
         auto itr = EntityInfoCache.find(entityId);
         if (itr != EntityInfoCache.end())
             itr->second.Enabled = enabled;
+ 
+        DoForeachComponentOfEntity(entityId, [enabled](EntityComponent& componnent)
+            {
+                if (enabled)
+                    componnent.OnEnabled();
+                else
+                    componnent.OnDisabled();
+            });
     }
 
     void AwakeEntity(size_t entityId)
     {
-        std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
-        auto itr = EntityInfoCache.find(entityId);
-        if (itr != EntityInfoCache.end())
-            itr->second.Awake = true;
+        {
+            std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+            auto itr = EntityInfoCache.find(entityId);
+            if (itr != EntityInfoCache.end())
+                itr->second.Awake = true;
+        }
+
+        DoForeachComponentOfEntity(entityId, [](EntityComponent& componnent)
+        {
+            componnent.OnAwake();
+        }
+        );
 
         TraceLog(LOG_INFO, "Awake Entity %zu", entityId);
     }
 
     void ClearAllEntities()
     {
-        for (auto& [componentType, table] : ComponentTables)
         {
-            table->Clear();
+            std::lock_guard<std::mutex> lock(TableLock);
+            for (auto& [componentType, table] : ComponentTables)
+            {
+                table->Clear();
+            }
         }
         std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
         EntityInfoCache.clear();
@@ -167,10 +204,12 @@ namespace EntitySystem
         for (size_t entityId : EntityMorgue)
         {
             ReleaseEntityId(entityId);
-
-            for (auto& [componentType, table] : ComponentTables)
             {
-                table->Remove(entityId);
+                std::lock_guard<std::mutex> lock(TableLock);
+                for (auto& [componentType, table] : ComponentTables)
+                {
+                    table->Remove(entityId);
+                }
             }
         }
 
@@ -179,11 +218,17 @@ namespace EntitySystem
 
     void DoForEachEntityWithComponent(size_t componentType, std::function<void(size_t&)> func, bool paralel, bool enabledOnly)
     {
-        auto itr = ComponentTables.find(componentType);
-        if (itr == ComponentTables.end() || !func)
-            return;
+        IComponentTable* table = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(TableLock);
+            auto itr = ComponentTables.find(componentType);
+            if (itr == ComponentTables.end() || !func)
+                return;
 
-        itr->second->DoForEach([&func](EntityComponent& component)
+            table = itr->second.get();
+        }
+
+        table->DoForEach([&func](EntityComponent& component)
             {
                 func(component.EntityID);
             }, paralel, enabledOnly);
@@ -191,13 +236,38 @@ namespace EntitySystem
 
     void DoForEachComponent(size_t componentType, std::function<void(EntityComponent&)> func, bool paralel, bool enabledOnly)
     {
-        auto itr = ComponentTables.find(componentType);
-        if (itr == ComponentTables.end() || !func)
-            return;
+        IComponentTable* table = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(TableLock);
+            auto itr = ComponentTables.find(componentType);
+            if (itr == ComponentTables.end() || !func)
+                return;
 
-        itr->second->DoForEach([&func](EntityComponent& component)
+            table = itr->second.get();
+        }
+
+        table->DoForEach([&func](EntityComponent& component)
             {
                 func(component);
             }, paralel, enabledOnly);
+    }
+
+    void DoForeachComponentOfEntity(size_t entityId, std::function<void(EntityComponent&)> func)
+    {
+        std::set<size_t>* components = nullptr;
+        {
+            std::lock_guard<std::recursive_mutex> lock(EntityInfoLock);
+            auto itr = EntityInfoCache.find(entityId);
+            if (itr == EntityInfoCache.end())
+                return;
+
+            components = &itr->second.ComponentTypes;
+        }
+        for (auto componentType : *components)
+        {
+            auto comp = GetComponentTable(componentType)->TryGet(entityId);
+            if (comp)
+                func(*comp);
+        }
     }
 }

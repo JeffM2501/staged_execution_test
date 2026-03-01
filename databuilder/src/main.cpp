@@ -9,20 +9,188 @@
 
 namespace fs = std::filesystem;
 
-static constexpr uint32_t Magic = 0x50465242; // "PFRB" in ASCII
-static constexpr uint32_t Version = 1;
+static constexpr uint32_t PrefabMagic = 0x50465242; // "PFRB" in ASCII
+static constexpr uint32_t PrefabVersion = 1;
 
-int main()
+static constexpr uint32_t SceneMagic = 0x53434E45; // "SCNE" in ASCII
+static constexpr uint32_t SceneVersion = 1;
+
+std::string inputFolder = "assets";
+std::string outputFolder = "resources/files";
+
+void SerailizePrefab(std::filesystem::path path)
 {
-    ComponentSerialization::SetupSerializers();
+    std::vector<uint8_t> binary;
 
-    std::string inputFolder = "assets";
-    std::string outputFolder = "resources/files";
-
-    for (const auto& entry : fs::directory_iterator(inputFolder))
+    std::ifstream in(path);
+    std::string jsonStr((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    rapidjson::Document prefab;
+    if (prefab.Parse(jsonStr.c_str()).HasParseError())
     {
-        std::vector<uint8_t> binary;
+        std::cerr << "Failed to parse JSON file: " << path << std::endl;
+        return;
+    }
 
+    binary.clear();
+
+    int spawnable = 0;
+
+    auto info = prefab.FindMember("Info");
+    if (info != prefab.MemberEnd() && info->value.IsObject())
+    {
+        auto spawnableIt = info->value.FindMember("spawnable");
+        if (spawnableIt != prefab.MemberEnd() && spawnableIt->value.IsBool())
+            spawnable = spawnableIt->value.GetBool() ? 1 : 0;
+    }
+
+    // header
+    WriteToOut(PrefabMagic, binary);
+    WriteToOut(PrefabVersion, binary);
+    WriteToOut(spawnable, binary);
+
+    auto entityList = prefab.FindMember("Entities");
+    if (entityList == prefab.MemberEnd() || !entityList->value.IsArray())
+    {
+        std::cerr << "Invalid prefab format in file: " << path << std::endl;
+        return;
+    }
+
+    for (auto& entity : entityList->value.GetArray())
+    {
+        int64_t entityId = entity["ID"].GetInt64();
+        auto componentList = entity.FindMember("Components");
+
+        if (componentList->value.IsObject())
+        {
+            uint32_t componentCount = 0;
+            for (auto& m : componentList->value.GetObject())
+                ++componentCount;
+
+            WriteToOut(entityId, binary);
+            WriteToOut(componentCount, binary);
+
+            for (auto& m : componentList->value.GetObject())
+            {
+                const char* name = m.name.GetString();
+                const rapidjson::Value& compValue = m.value;
+
+                // Use member name as type if the component doesn't include a "Type" field
+                std::string type;
+                auto typeIt = compValue.FindMember("Type");
+                if (typeIt != compValue.MemberEnd() && typeIt->value.IsString())
+                    type = typeIt->value.GetString();
+                else
+                    type = name;
+
+                uint64_t componentId = Hashes::CRC64Str(type);
+
+                WriteToOut(componentId, binary);
+
+                std::vector<uint8_t> compData;
+                ComponentSerialization::Serialize(type, compValue, compData);
+
+                uint32_t dataSize = static_cast<uint32_t>(compData.size());
+                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&dataSize), reinterpret_cast<uint8_t*>(&dataSize) + sizeof(dataSize));
+                binary.insert(binary.end(), compData.begin(), compData.end());
+            }
+        }
+    }
+
+    std::string hashedName = path.string();
+    hashedName = hashedName.substr(inputFolder.size() + 1);
+
+    std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
+    std::ofstream out(outputPath, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(binary.data()), binary.size());
+    out.close();
+}
+
+void SerailizeScene(std::filesystem::path path)
+{
+    std::vector<uint8_t> binary;
+
+    std::ifstream in(path);
+    std::string jsonStr((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    rapidjson::Document scene;
+    if (scene.Parse(jsonStr.c_str()).HasParseError())
+    {
+        std::cerr << "Failed to parse JSON file: " << path << std::endl;
+        return;
+    }
+
+    binary.clear();
+
+    // header
+    WriteToOut(SceneMagic, binary);
+    WriteToOut(SceneVersion, binary);
+
+    auto entityList = scene.FindMember("Entities");
+    if (entityList == scene.MemberEnd() || !entityList->value.IsArray())
+    {
+        std::cerr << "Invalid prefab format in file: " << path << std::endl;
+        return;
+    }
+
+    for (auto& entity : entityList->value.GetArray())
+    {
+        int64_t entityId = entity["ID"].GetInt64();
+        auto componentList = entity.FindMember("Components");
+
+        if (componentList->value.IsObject())
+        {
+            uint32_t componentCount = 0;
+            for (auto& m : componentList->value.GetObject())
+                ++componentCount;
+
+            WriteToOut(entityId, binary);
+            WriteToOut(componentCount, binary);
+
+            for (auto& m : componentList->value.GetObject())
+            {
+                const char* name = m.name.GetString();
+                const rapidjson::Value& compValue = m.value;
+
+                // Use member name as type if the component doesn't include a "Type" field
+                std::string type;
+                auto typeIt = compValue.FindMember("Type");
+                if (typeIt != compValue.MemberEnd() && typeIt->value.IsString())
+                    type = typeIt->value.GetString();
+                else
+                    type = name;
+
+                uint64_t componentId = Hashes::CRC64Str(type);
+
+                WriteToOut(componentId, binary);
+
+                std::vector<uint8_t> compData;
+                ComponentSerialization::Serialize(type, compValue, compData);
+
+                uint32_t dataSize = static_cast<uint32_t>(compData.size());
+                binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&dataSize), reinterpret_cast<uint8_t*>(&dataSize) + sizeof(dataSize));
+                binary.insert(binary.end(), compData.begin(), compData.end());
+            }
+        }
+    }
+
+
+    std::string hashedName = path.string();
+    hashedName = hashedName.substr(inputFolder.size() + 1);
+
+    std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
+    std::ofstream out(outputPath, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(binary.data()), binary.size());
+    out.close();
+}
+
+void ProcessFolder(const std::string folder)
+{
+    for (const auto& entry : fs::directory_iterator(folder))
+    {
+        if (entry.is_directory())
+        {
+            ProcessFolder(entry.path().string());
+            continue;
+        }
         if (!entry.is_regular_file())
             continue;
 
@@ -30,88 +198,23 @@ int main()
         if (path.extension() != ".json")
             continue;
 
-        std::ifstream in(path);
-        std::string jsonStr((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        rapidjson::Document prefab;
-        if (prefab.Parse(jsonStr.c_str()).HasParseError())
+        auto stem = path.stem();
+        auto ext = stem.extension();
+        if (ext.string() == ".prefab")
         {
-            std::cerr << "Failed to parse JSON file: " << path << std::endl;
-            continue;
+            SerailizePrefab(path);
         }
-
-        binary.clear();
-
-        int spawnable = 0;
-
-        auto info = prefab.FindMember("Info");
-        if (info != prefab.MemberEnd() && info->value.IsObject())
+        else if (ext.string() == ".scene")
         {
-            auto spawnableIt = info->value.FindMember("spawnable");
-            if (spawnableIt != prefab.MemberEnd() && spawnableIt->value.IsBool())
-                spawnable = spawnableIt->value.GetBool() ? 1 : 0;
+            SerailizeScene(path);
         }
-
-        // header
-        WriteToOut(Magic, binary);
-        WriteToOut(Version, binary);
-        WriteToOut(spawnable, binary);
-
-        auto entityList = prefab.FindMember("Entities");
-        if (entityList == prefab.MemberEnd() || !entityList->value.IsArray())
-        {
-            std::cerr << "Invalid prefab format in file: " << path << std::endl;
-            continue;
-        }
-
-        for (auto& entity : entityList->value.GetArray())
-        {
-            int64_t entityId = entity["ID"].GetInt64();
-            auto componentList = entity.FindMember("Components");
-      
-            if (componentList->value.IsObject())
-            {
-                uint32_t componentCount = 0;
-                for (auto& m : componentList->value.GetObject())
-                    ++componentCount;
-
-                WriteToOut(entityId, binary);
-                WriteToOut(componentCount, binary);
-               
-                for (auto& m : componentList->value.GetObject())
-                {
-                    const char* name = m.name.GetString();
-                    const rapidjson::Value& compValue = m.value;
-
-                    // Use member name as type if the component doesn't include a "Type" field
-                    std::string type;
-                    auto typeIt = compValue.FindMember("Type");
-                    if (typeIt != compValue.MemberEnd() && typeIt->value.IsString())
-                        type = typeIt->value.GetString();
-                    else
-                        type = name;
-
-                    uint64_t componentId = Hashes::CRC64Str(type);
-
-                    WriteToOut(componentId, binary);
-
-                    std::vector<uint8_t> compData;
-                    ComponentSerialization::Serialize(type, compValue, compData);
-
-                    uint32_t dataSize = static_cast<uint32_t>(compData.size());
-                    binary.insert(binary.end(), reinterpret_cast<uint8_t*>(&dataSize), reinterpret_cast<uint8_t*>(&dataSize) + sizeof(dataSize));
-                    binary.insert(binary.end(), compData.begin(), compData.end());
-                }
-            }
-        }
-
-        std::string hashedName = path.stem().string();
-        hashedName += hashedName.substr(inputFolder.size() + 1);
-
-        std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
-        std::ofstream out(outputPath, std::ios::binary);
-        out.write(reinterpret_cast<const char*>(binary.data()), binary.size());
-        out.close();
     }
+}
 
+int main()
+{
+    ComponentSerialization::SetupSerializers();
+
+    ProcessFolder(inputFolder);
     return 0;
 }

@@ -5,6 +5,9 @@
 #include <cstring>
 #include <type_traits>
 #include <stdexcept>
+#include <functional>
+
+#include "raylib.h"
 
 namespace EntitySystem
 {
@@ -34,12 +37,11 @@ namespace EntityReader
             return value;
         }
 
-        template<>
-        Color Read()
+        Color ReadColor()
         {
             Color c = { Read<uint8_t>(), Read<uint8_t>(), Read<uint8_t>(), Read<uint8_t>() };
             return c;
-        };
+        }
 
         BufferReader ReadBuffer(size_t length)
         {
@@ -65,17 +67,20 @@ namespace EntityReader
 
     private:
         std::span<const uint8_t> m_buffer;
-        size_t m_offset;
+        size_t m_offset = 0;
     };
 
     // EntityReader reads entity/component data from a binary file using the resource manager file type.
     class Reader
     {
     public:
+
+        using OnEntityReadCallback = std::function<void(std::span<size_t> loadedEntities)>;
+
         // Reads entities and components from a resource file (ResourceManager).
         // Each entity is created with the ID from the file, and components are added by component ID.
         // For each component, the buffer is passed to OnComponentData for initialization.
-        void ReadEntitiesFromResource(size_t resourceHash);
+        void ReadEntitiesFromResource(size_t resourceHash, OnEntityReadCallback onReadComplete = nullptr);
 
     protected:
         // Called for each created component, passing the buffer with component data.

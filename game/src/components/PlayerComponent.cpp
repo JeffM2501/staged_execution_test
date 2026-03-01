@@ -1,6 +1,6 @@
 #include "components/PlayerComponent.h"
 #include "components/TransformComponent.h"
-#include "components/BulletComponent.h"
+#include "GameInfo.h"
 
 #include "TimeUtils.h"
 
@@ -17,15 +17,20 @@ void PlayerComponent::Update()
             {
                 LastShotTime = GetFrameStartTime();
 
-                auto bullet = EntitySystem::AddComponent<BulletComponent>(EntitySystem::NewEntityId());
-                auto bulletTransform = bullet->AddComponent<TransformComponent>();
-                bulletTransform->Position = transform->Position;
+                Vector2 pos = transform->Position;
 
-                constexpr int spread = 50;
-                float speed = PlayerSpeed * 2 + float(GetRandomValue(0, int(PlayerSpeed)));
+                PrefabReader.ReadEntitiesFromResource(BulletPrefab, [pos, this](std::span<size_t> entities)
+                    {
+                        auto bulletTransform = EntitySystem::GetEntityComponent<TransformComponent>(entities[0]);
+                        if (bulletTransform)
+                        {
+                            bulletTransform->Position = pos;
+                            constexpr int spread = 50;
+                            float speed = PlayerSpeed * 2 + float(GetRandomValue(0, int(PlayerSpeed)));
 
-                bulletTransform->Velocity = Vector2(speed, float(GetRandomValue(-spread, spread))) + (Input * PlayerSpeed);
-                EntitySystem::AwakeEntity(bullet->EntityID);
+                            bulletTransform->Velocity = Vector2(speed, float(GetRandomValue(-spread, spread))) + (Input * PlayerSpeed);
+                        }
+                    });
             }
         }
     }

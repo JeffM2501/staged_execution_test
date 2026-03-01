@@ -19,6 +19,8 @@
 #include "components/NPCComponent.h"
 #include "components/BulletComponent.h"
 
+#include "ComponentReader.h"
+
 #include "tasks/Input.h"
 #include "tasks/Draw.h"
 #include "tasks/Overlay.h"
@@ -120,54 +122,7 @@ void RegisterLayers()
     DebugLayer = PresentationManager::DefineLayer(uint8_t(DebugLayer));
 }
 
-class ComponentReader : public EntityReader::Reader
-{
-protected:
-    void OnComponentData(EntitySystem::EntityComponent* component, size_t componentId, EntityReader::BufferReader& buffer) override
-    {
-        // find the deserializer and call it
-        if (componentId == TransformComponent::GetComponentId())
-        {
-            auto transform = static_cast<TransformComponent*>(component);
-            transform->Position.x = buffer.Read<float>();
-            transform->Position.y = buffer.Read<float>();
-            transform->Velocity.x = buffer.Read<float>();
-            transform->Velocity.y = buffer.Read<float>();
-
-            TraceLog(LOG_INFO, "Loaded Transform for entity %zu", component->EntityID);
-        }
-        else if (componentId == PlayerComponent::GetComponentId())
-        {
-            auto player = static_cast<PlayerComponent*>(component);
-            player->Size = buffer.Read<float>();
-            player->Health = buffer.Read<float>();
-            player->PlayerSpeed = buffer.Read<float>();
-            player->ReloadTime = buffer.Read<float>();
-
-            TraceLog(LOG_INFO, "Loaded PlayerComponent for entity %zu", component->EntityID);
-        }
-        else if (componentId == NPCComponent::GetComponentId())
-        {
-            auto npc = static_cast<NPCComponent*>(component);
-            npc->Size = buffer.Read<float>();
-            npc->Tint = buffer.Read<Color>();
-
-            TraceLog(LOG_INFO, "Loaded NPCComponent for entity %zu", component->EntityID);
-        }
-        else if (componentId == BulletComponent::GetComponentId())
-        {
-            auto bullet = static_cast<BulletComponent*>(component);
-            bullet->Size = buffer.Read<float>();
-            bullet->Damage = buffer.Read<float>();
-            bullet->Lifetime = buffer.Read<float>();
-            bullet->Tint = buffer.Read<Color>();
-
-            TraceLog(LOG_INFO, "Loaded BulletComponent for entity %zu", component->EntityID);
-        }
-    }
-};
-
-ComponentReader Reader;
+ComponentReader PrefabReader;
 
 void GameInit()
 {
@@ -188,7 +143,10 @@ void GameInit()
     RegisterTasks();
     RegisterComponents();
 
-    Reader.ReadEntitiesFromResource(6365428038355519192);
+    PrefabReader.ReadEntitiesFromResource(Hashes::CRC64Str("entity.prefab.json"), [](std::span<size_t> entities)
+        {
+            EntitySystem::GetEntityComponent<TransformComponent>(entities[0])->Position = { 300,300 };
+        });
 
     WorldBounds.store(BoundingBox2D{ Vector2{0,0}, Vector2{float(GetScreenWidth()), float(GetScreenHeight())} });
 

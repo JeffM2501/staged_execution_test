@@ -10,5 +10,7 @@ struct PlayerSpawnComponent : public EntitySystem::EntityComponent
 
     double LastUpdateTime = 0;
 
-    void Update();
+    size_t PlayerPrefab = 0;
+
+    void OnAwake() override;
 };
