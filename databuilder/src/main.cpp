@@ -16,24 +16,16 @@ static constexpr uint32_t PrefabVersion = 1;
 static constexpr uint32_t SceneMagic = 0x53434E45; // "SCNE" in ASCII
 static constexpr uint32_t SceneVersion = 1;
 
+static constexpr uint32_t SpriteMagic = 0x53505254; // "SPRT" in ASCII
+static constexpr uint32_t SpriteVersion = 1;
+
 std::string inputFolder = "assets";
-std::string outputFolder = "resources/files";
+std::string filesOutputFolder = "resources/files";
+std::string imagesOutputFolder = "resources/images";
 
-void SerailizePrefab(std::filesystem::path path)
+
+void SerailizePrefab(std::vector<uint8_t>& binary, rapidjson::Document& prefab)
 {
-    std::vector<uint8_t> binary;
-
-    std::ifstream in(path);
-    std::string jsonStr((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    rapidjson::Document prefab;
-    if (prefab.Parse(jsonStr.c_str()).HasParseError())
-    {
-        std::cerr << "Failed to parse JSON file: " << path << std::endl;
-        return;
-    }
-
-    binary.clear();
-
     int spawnable = 0;
 
     auto info = prefab.FindMember("Info");
@@ -52,7 +44,7 @@ void SerailizePrefab(std::filesystem::path path)
     auto entityList = prefab.FindMember("Entities");
     if (entityList == prefab.MemberEnd() || !entityList->value.IsArray())
     {
-        std::cerr << "Invalid prefab format in file: " << path << std::endl;
+        std::cerr << "Invalid prefab format in file: " << std::endl;
         return;
     }
 
@@ -96,31 +88,10 @@ void SerailizePrefab(std::filesystem::path path)
             }
         }
     }
-
-    std::string hashedName = path.string();
-    hashedName = hashedName.substr(inputFolder.size() + 1);
-
-    std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
-    std::ofstream out(outputPath, std::ios::binary);
-    out.write(reinterpret_cast<const char*>(binary.data()), binary.size());
-    out.close();
 }
 
-void SerailizeScene(std::filesystem::path path)
+void SerailizeScene(std::vector<uint8_t>& binary, rapidjson::Document& scene)
 {
-    std::vector<uint8_t> binary;
-
-    std::ifstream in(path);
-    std::string jsonStr((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    rapidjson::Document scene;
-    if (scene.Parse(jsonStr.c_str()).HasParseError())
-    {
-        std::cerr << "Failed to parse JSON file: " << path << std::endl;
-        return;
-    }
-
-    binary.clear();
-
     // header
     WriteToOut(SceneMagic, binary);
     WriteToOut(SceneVersion, binary);
@@ -128,7 +99,7 @@ void SerailizeScene(std::filesystem::path path)
     auto entityList = scene.FindMember("Entities");
     if (entityList == scene.MemberEnd() || !entityList->value.IsArray())
     {
-        std::cerr << "Invalid prefab format in file: " << path << std::endl;
+        std::cerr << "Invalid prefab format in file: " << std::endl;
         return;
     }
 
@@ -172,17 +143,51 @@ void SerailizeScene(std::filesystem::path path)
             }
         }
     }
+}
 
+void SerailizeSprite(std::vector<uint8_t> &binary, rapidjson::Document& sprite)
+{
+    // header
+    WriteToOut(SpriteMagic, binary);
+    WriteToOut(SpriteVersion, binary);
 
-    std::string hashedName = path.string();
-    hashedName = hashedName.substr(inputFolder.size() + 1);
+    auto image = sprite.FindMember("Image");
+    if (image == sprite.MemberEnd() || !image->value.IsString())
+    {
+        std::cerr << "Invalid Sprite format in file: " << std::endl;
+        return;
+    }
 
-    std::replace(hashedName.begin(), hashedName.end(), '\\', '/'); 
+    size_t imageHash = Hashes::CRC64Str(image->value.GetString());
+    WriteToOut(imageHash, binary); 
 
-    std::string outputPath = outputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
-    std::ofstream out(outputPath, std::ios::binary);
-    out.write(reinterpret_cast<const char*>(binary.data()), binary.size());
-    out.close();
+    auto frameType = sprite.FindMember("FrameType");
+
+    bool validFrameDef = false;
+
+    if (frameType != sprite.MemberEnd() && frameType->value.IsString())
+    {
+        if (frameType->value.GetString() == "Grid")
+        {
+            auto gridInfo = sprite.FindMember("GridInfo");
+            if (gridInfo != sprite.MemberEnd() && gridInfo->value.IsObject())
+            {
+                validFrameDef = true;
+            }
+
+        }
+    }
+
+    if (!validFrameDef)
+    {
+        // just write one rectangle for the entire sprite
+        WriteToOut<uint32_t>(1, binary); // frame count
+        WriteToOut<float>(0, binary); // x
+        WriteToOut<float>(0, binary); // y
+        WriteToOut<float>(1, binary); // width
+        WriteToOut<float>(1, binary); // height
+    }
+    
 }
 
 void ProcessFolder(const std::string folder)
@@ -198,18 +203,53 @@ void ProcessFolder(const std::string folder)
             continue;
 
         const auto& path = entry.path();
-        if (path.extension() != ".json")
-            continue;
+        if (path.extension() == ".json")
+        {
+            std::vector<uint8_t> binary;
 
-        auto stem = path.stem();
-        auto ext = stem.extension();
-        if (ext.string() == ".prefab")
-        {
-            SerailizePrefab(path);
+            std::ifstream in(path);
+            std::string jsonStr((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            rapidjson::Document doc;
+            if (doc.Parse(jsonStr.c_str()).HasParseError())
+            {
+                std::cerr << "Failed to parse JSON file: " << path << std::endl;
+                continue;;
+            }
+
+            binary.clear();
+
+            auto stem = path.stem();
+            auto ext = stem.extension();
+            if (ext.string() == ".prefab")
+            {
+                SerailizePrefab(binary, doc);
+            }
+            else if (ext.string() == ".scene")
+            {
+                SerailizeScene(binary, doc);
+            }
+            else if (ext.string() == ".sprite")
+            {
+                SerailizeSprite(binary, doc);
+            }
+
+            std::string hashedName = path.string();
+            hashedName = hashedName.substr(inputFolder.size() + 1);
+
+            std::replace(hashedName.begin(), hashedName.end(), '\\', '/');
+
+            std::string outputPath = filesOutputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".bin";
+            std::ofstream out(outputPath, std::ios::binary);
+            out.write(reinterpret_cast<const char*>(binary.data()), binary.size());
+            out.close();
         }
-        else if (ext.string() == ".scene")
+        if (path.extension() == ".png")
         {
-            SerailizeScene(path);
+            std::string hashedName = path.string();
+            hashedName = hashedName.substr(inputFolder.size() + 1);
+            std::replace(hashedName.begin(), hashedName.end(), '\\', '/'); 
+            std::string outputPath = imagesOutputFolder + "/" + std::to_string(Hashes::CRC64Str(hashedName)) + ".png";
+            fs::copy_file(path, outputPath, fs::copy_options::overwrite_existing);
         }
     }
 }
@@ -217,6 +257,8 @@ void ProcessFolder(const std::string folder)
 int main()
 {
     ComponentSerialization::SetupSerializers();
+    fs::create_directories(imagesOutputFolder);
+    fs::create_directories(filesOutputFolder);
 
     ProcessFolder(inputFolder);
     return 0;

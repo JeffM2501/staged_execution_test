@@ -7,7 +7,7 @@
 #include "components/PlayerSpawnComponent.h"
 #include "components/NPCSpawnComponent.h"
 
-void ComponentReader::OnComponentData(EntitySystem::EntityComponent* component, size_t componentId, EntityReader::BufferReader& buffer)
+void ComponentReader::OnComponentData(EntitySystem::EntityComponent* component, size_t componentId, BufferReader& buffer)
 {
     // find the deserializer and call it
     if (componentId == TransformComponent::GetComponentId())
