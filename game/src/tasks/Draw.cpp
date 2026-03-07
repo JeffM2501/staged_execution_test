@@ -21,7 +21,7 @@ void DrawTask::Tick()
             auto transform = player.GetEntityComponent<TransformComponent>();
             if (transform)
             {
-                DrawCircleV(transform->Position, player.Size, GREEN);
+                player.Sprite.Draw(transform->Position, WHITE);
             }
         });
 
@@ -30,8 +30,7 @@ void DrawTask::Tick()
             auto transform = bullet.GetEntityComponent<TransformComponent>();
             if (transform)
             {
-                DrawCircleV(transform->Position, bullet.Size, bullet.Tint);
-                DrawText(TextFormat("%0.2f ID %zu", bullet.Lifetime, bullet.EntityID), int(transform->Position.x + bullet.Size), int(transform->Position.y-5), 10, GRAY);
+                bullet.Sprite.Draw(transform->Position, bullet.Tint);
             }
         });
     PresentationManager::EndLayer();
@@ -47,7 +46,8 @@ void DrawTask::Tick()
                 if (UseInterpolateNPCs)
                     interpPos += transform->Velocity * float(now - npc.LastUpdateTime);
 
-                DrawRectangleRec(Rectangle(interpPos.x, interpPos.y, npc.Size * 2, npc.Size * 2), npc.Tint);
+                npc.Sprite.Scale = npc.Size / 2.0f;
+                npc.Sprite.Draw(interpPos, npc.Tint);
             }
         });
     PresentationManager::EndLayer();

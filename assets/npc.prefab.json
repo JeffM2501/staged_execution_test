@@ -13,7 +13,12 @@
         },
         "NPCComponent": {
           "Size": 20,
-          "Tint": [ 0, 82, 172, 255 ]
+          "Tint": [ 0, 82, 172, 255 ],
+          "Sprite": {
+            "Sheet": "space.sprite.json",
+            "Frame": 32,
+            "Rotation": 0
+          }
         }
       }
     }

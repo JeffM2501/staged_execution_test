@@ -4,6 +4,7 @@
 #include "raymath.h"
 
 #include "EntitySystem.h"
+#include "SpriteManager.h"
 
 struct PlayerComponent : public EntitySystem::EntityComponent
 {
@@ -24,5 +25,9 @@ struct PlayerComponent : public EntitySystem::EntityComponent
 
     size_t BulletPrefab = 0;
 
+    SpriteManager::SpriteInstance Sprite;
+
     void Update();
+
+    void OnAwake() override;
 };

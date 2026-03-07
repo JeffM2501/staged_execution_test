@@ -4,6 +4,10 @@
 
 #include "TimeUtils.h"
 
+void PlayerComponent::OnAwake()
+{
+}
+
 void PlayerComponent::Update()
 {
     auto transform = GetEntityComponent<TransformComponent>();
@@ -11,12 +15,12 @@ void PlayerComponent::Update()
     {
         transform->Position += Input * PlayerSpeed * GetDeltaTime();
 
+        LastShotTime += GetDeltaTime();
         if (ShootThisFrame)
         {
-            LastShotTime += GetDeltaTime();
-            while (LastShotTime > ReloadTime)
+            if (LastShotTime > ReloadTime)
             {
-                LastShotTime -= ReloadTime;
+                LastShotTime = 0;;
 
                 Vector2 pos = transform->Position;
 
@@ -27,7 +31,7 @@ void PlayerComponent::Update()
                         {
                             bulletTransform->Position = pos;
                             constexpr int spread = 50;
-                            float speed = PlayerSpeed * 2 + float(GetRandomValue(0, int(PlayerSpeed)));
+                            float speed = PlayerSpeed * 3 + float(GetRandomValue(0, int(PlayerSpeed)));
 
                             bulletTransform->Velocity = Vector2(speed, float(GetRandomValue(-spread, spread))) + (Input * PlayerSpeed);
                         }

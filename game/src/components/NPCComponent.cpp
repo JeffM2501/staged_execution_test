@@ -46,8 +46,9 @@ void NPCComponent::Update()
     auto transform = GetEntityComponent<TransformComponent>();
     if (transform)
     {
+        float realSize = Sprite.SpriteRef->Frames[Sprite.CurrentFrame].width * Sprite.SpriteRef->Texture->Bounds.width * Sprite.Scale;
         float delta = TaskManager::GetFixedDeltaTime();
-        MoveEntity(*transform, Size, transform->Velocity * delta, WorldBounds.load());
+        MoveEntity(*transform, realSize*0.5f, transform->Velocity * delta, WorldBounds.load());
         LastUpdateTime = GetFrameStartTime();
     }
 }

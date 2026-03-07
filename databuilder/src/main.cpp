@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <rapidjson/document.h>
 #include "ComponentSerialization.h"
+#include "SerializationUtils.h"
 #include "CRC64.h"
 #include <iostream>
 
@@ -167,14 +168,60 @@ void SerailizeSprite(std::vector<uint8_t> &binary, rapidjson::Document& sprite)
 
     if (frameType != sprite.MemberEnd() && frameType->value.IsString())
     {
-        if (frameType->value.GetString() == "Grid")
+        std::string frameTypeStr = frameType->value.GetString();
+        if (frameTypeStr == "Grid")
         {
             auto gridInfo = sprite.FindMember("GridInfo");
             if (gridInfo != sprite.MemberEnd() && gridInfo->value.IsObject())
             {
                 validFrameDef = true;
-            }
 
+                int width = ReadJsonMemberValue<int>("Width", gridInfo->value, 1);
+                int height = ReadJsonMemberValue<int>("Height", gridInfo->value, 1);
+
+                float xOffset = 1.0f / float(width);
+                float yOffset = 1.0f / float(height);
+
+                WriteToOut<uint32_t>(width*height, binary); // frame count
+                for (int j = 0; j < height; ++j)
+                {
+                    for (int i = 0; i < width; ++i)
+                    {
+                        std::vector<float> frameRect{
+                            i * xOffset, // x
+                            j * yOffset, // y
+                            xOffset,     // width
+                            yOffset      // height
+                        };
+                        WriteArrayToOut(frameRect, binary);
+                    }
+                }
+            }
+        }
+        else if (frameType->value.GetString() == "List")
+        {
+            auto frameList = sprite.FindMember("Frames");
+            if (frameList != sprite.MemberEnd() && frameList->value.IsArray())
+            {
+                validFrameDef = true;
+                uint32_t frameCount = static_cast<uint32_t>(frameList->value.Size());
+                WriteToOut(frameCount, binary); // frame count
+                for (auto& frame : frameList->value.GetArray())
+                {
+                    if (frame.IsArray())
+                    {
+                        std::vector<float> frameRect;
+                        for (auto& v : frame.GetArray())
+                        {
+                            if (v.IsNumber())
+                                frameRect.push_back(v.GetFloat());
+                            else
+                                frameRect.push_back(0.0f);
+                        }
+                        WriteArrayToOut(frameRect, binary);
+                    }
+                }
+            }
         }
     }
 
@@ -182,12 +229,8 @@ void SerailizeSprite(std::vector<uint8_t> &binary, rapidjson::Document& sprite)
     {
         // just write one rectangle for the entire sprite
         WriteToOut<uint32_t>(1, binary); // frame count
-        WriteToOut<float>(0, binary); // x
-        WriteToOut<float>(0, binary); // y
-        WriteToOut<float>(1, binary); // width
-        WriteToOut<float>(1, binary); // height
+        WriteArrayToOut(std::vector<float>{0, 0, 1, 1}, binary); // frame rect
     }
-    
 }
 
 void ProcessFolder(const std::string folder)
@@ -203,6 +246,7 @@ void ProcessFolder(const std::string folder)
             continue;
 
         const auto& path = entry.path();
+        std::cout << "Processing file : " << path << std::endl;
         if (path.extension() == ".json")
         {
             std::vector<uint8_t> binary;

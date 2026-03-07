@@ -8,20 +8,23 @@ namespace SpriteManager
 {
     std::unordered_map<size_t, SpriteReference> Sprites;
 
-    void Sprite::Draw(size_t frame, Vector2 position, float scale, Color tint)
+    void Sprite::Draw(size_t frame, Vector2 position, float scale, float rotation, Color tint)
     {
         if (!Ready.load(std::memory_order_acquire))
             return;
+
         auto it = Frames.find(frame);
         if (it == Frames.end())
             return;
-        Rectangle sourceRect = it->second;
-        DrawTexturePro(Texture->ID, sourceRect, { position.x, position.y, sourceRect.width * scale, sourceRect.height * scale }, { 0,0 }, 0.0f, tint);
+
+        Rectangle sourceRect = Rectangle{ it->second.x * Texture->ID.width, it->second.y * Texture->ID.height, it->second.width * Texture->ID.width, it->second.height * Texture->ID.height };
+        Rectangle destRect = { position.x, position.y, sourceRect.width * scale, sourceRect.height * scale };
+        DrawTexturePro(Texture->ID, sourceRect, destRect, { destRect.width * 0.5f, destRect.height * 0.5f }, rotation, tint);
     }
 
     void SpriteInstance::Draw(Vector2 position, Color tint)
     {
-        SpriteRef->Draw(CurrentFrame, position, 1.0f, tint);
+        SpriteRef->Draw(CurrentFrame, position, Scale, Rotation, tint);
     }
 
     SpriteInstance SpriteInstance::Clone()
@@ -39,15 +42,18 @@ namespace SpriteManager
             {
                 // TODO, parse sprite data
                 BufferReader reader(std::get<std::vector<unsigned char>>(data->Data));
+
+                reader.Read<uint32_t>();
+                reader.Read<uint32_t>();
+
                 size_t textureHash = reader.Read<size_t>();
 
                 sprite->Texture = TextureManager::GetTexture(textureHash);
-                size_t frameCount = reader.Read<size_t>();
-                for (size_t i = 0; i < frameCount; i++)
+                uint32_t frameCount = reader.Read<uint32_t>();
+                for (uint32_t i = 0; i < frameCount; i++)
                 {
-                    size_t frameHash = reader.Read<size_t>();
                     Rectangle frameRect = { reader.Read<float>(), reader.Read<float>(), reader.Read<float>(), reader.Read<float>() };
-                    sprite->Frames[frameHash] = frameRect;
+                    sprite->Frames[i] = frameRect;
                 }
                 sprite->Ready.store(true);
             });
@@ -60,6 +66,16 @@ namespace SpriteManager
     {
         SpriteInstance instance;
         instance.SpriteRef = ref;
+        return instance;
+    }
+
+    SpriteInstance LoadFromBuffer(BufferReader& buffer)
+    {
+        auto hash = buffer.Read<size_t>();
+        SpriteInstance instance = LoadResoruce(hash);
+        instance.CurrentFrame = buffer.Read<uint32_t>();
+        instance.Rotation = buffer.Read<float>();
+
         return instance;
     }
 }

@@ -1,8 +1,6 @@
 #include "ComponentSerialization.h"
 
-#include "CRC64.h"
-
-#include "rapidjson/rapidjson.h"
+#include "SerializationUtils.h"
 
 #include <unordered_map>
 #include <functional>
@@ -10,107 +8,21 @@
 namespace ComponentSerialization
 {
 
-    bool ReadColor(uint8_t color[4], const rapidjson::Value& colorValue)
+    void SeralizeSpriteReference(const std::string& name, const rapidjson::Value& value, std::vector<uint8_t>& out)
     {
-        if (colorValue.IsArray())
+        auto spriteIt = value.FindMember(name.c_str());
+        if (spriteIt != value.MemberEnd() && spriteIt->value.IsObject())
         {
-            const auto& colorArray = colorValue;
-            for (rapidjson::SizeType i = 0; i < colorArray.Size() && i < 4; ++i)
-            {
-                if (colorArray[i].IsUint())
-                    color[i] = static_cast<uint8_t>(colorArray[i].GetUint());
-            }
-            return true;
+            SeralizeAssetReference("Sheet", spriteIt->value, out);
+            SerializeNumber<uint32_t>("Frame", 0, spriteIt->value, out);
+            SerializeNumber<float>("Rotation", 0, spriteIt->value, out);
         }
-        return false;
-    }
-
-    template<typename T>
-    bool ReadValueNumber(std::string_view name, T& out, const rapidjson::Value& value)
-    {
-        auto it = value.FindMember(name.data());
-        if (it != value.MemberEnd() && it->value.IsNumber())
+        else
         {
-            out = static_cast<T>(it->value.Get<T>());
-            return true;
+            WriteToOut(size_t(0), out); // default to no sprite
+            WriteToOut(uint32_t(0), out); // default to no sprite
+            WriteToOut(float(0), out); // default to no sprite
         }
-        return false;
-    }
-
-    template<typename T>
-    bool ReadValueNumberArray(std::string_view name, std::span<T> out, const rapidjson::Value& value)
-    {
-        auto it = value.FindMember(name.data());
-        if (it != value.MemberEnd() && it->value.IsArray())
-        {
-            const auto& valueArray = it->value;
-            for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < out.size(); ++i)
-            {
-                if (valueArray[i].IsNumber())
-                    out[i] = valueArray[i].Get<T>();
-            }
-            return true;
-        }
-        return false;
-    }
-
-    template<typename T>
-    void SerializeNumber(std::string_view name, T defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
-    {
-        T binValue = defaultValue;
-        ReadValueNumber(name, binValue, value);
-        WriteToOut(binValue, out);
-    }
-
-    template<typename T>
-    void SerializeNumberArray(std::string_view name, const std::vector<T>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
-    {
-        // Make a mutable copy initialized from the provided default.
-        std::vector<T> binValue = defaultValue;
-
-        // Create a span over the vector so ReadValueNumberArray can fill it.
-        std::span<T> binSpan(binValue);
-
-        // Read values from JSON into our span (will overwrite elements up to span.size()).
-        ReadValueNumberArray<T>(name, binSpan, value);
-
-        // Serialize the resulting numeric array to output.
-        WriteArrayToOut<T>(binValue, out);
-    }
-
-    void SerializeColor(std::string_view name, const std::vector<uint8_t>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
-    {
-        // Make a mutable copy initialized from the provided default.
-        std::vector<uint8_t> binValue = defaultValue;
-
-        auto it = value.FindMember(name.data());
-        if (it != value.MemberEnd() && it->value.IsArray())
-        {
-            const auto& valueArray = it->value;
-            for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < out.size(); ++i)
-            {
-                if (valueArray[i].IsNumber())
-                    binValue[i] = uint8_t(valueArray[i].GetUint());
-            }
-        }
-
-        // Serialize the resulting numeric array to output.
-        WriteArrayToOut<uint8_t>(binValue, out);
-    }
-
-    void SeralizeAssetReference(std::string_view name, const rapidjson::Value& value, std::vector<uint8_t>& out)
-    {
-        // Make a mutable copy initialized from the provided default.
-       size_t nameValue;
-
-        auto it = value.FindMember(name.data());
-        if (it != value.MemberEnd() && it->value.IsString())
-        {
-            nameValue = Hashes::CRC64Str(it->value.GetString());
-        }
-
-        // Serialize the resulting numeric array to output.
-        WriteToOut<size_t>(nameValue, out);
     }
 
     void SerializeTransform(const rapidjson::Value& j, std::vector<uint8_t>& out)
@@ -126,12 +38,15 @@ namespace ComponentSerialization
         SerializeNumber("PlayerSpeed", 100.0f, j, out);
         SerializeNumber("ReloadTime", 0.25f, j, out);
         SeralizeAssetReference("BulletPrefab", j, out);
+
+        SeralizeSpriteReference("Sprite", j, out);
     }
 
     void SerializeNPC(const rapidjson::Value& j, std::vector<uint8_t>& out)
     {
         SerializeNumber("Size", 20.0f, j, out);
         SerializeColor("Tint", { 0,0,255,255 }, j, out);
+        SeralizeSpriteReference("Sprite", j, out);
     }
 
     void SerializeBullet(const rapidjson::Value& j, std::vector<uint8_t>& out)
@@ -140,6 +55,7 @@ namespace ComponentSerialization
         SerializeNumber("Damage", 10.0f, j, out);
         SerializeNumber("Lifetime", 1.0f, j, out);
         SerializeColor("Tint", { 255,255,0,255 }, j, out);
+        SeralizeSpriteReference("Sprite", j, out);
     }
 
     void SerializePlayerSpawn(const rapidjson::Value& j, std::vector<uint8_t>& out)

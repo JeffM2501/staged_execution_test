@@ -5,7 +5,7 @@
 
 GUITask::GUITask() : Task(FrameStage::PreDraw, true)
 {
-    Logo = TextureManager::GetTexture(101010101010);
+    Logo = TextureManager::GetTexture(Hashes::CRC64Str("logo.png"));
 }
 
 GUITask::~GUITask()

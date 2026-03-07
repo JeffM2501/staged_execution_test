@@ -14,8 +14,13 @@
         "PlayerComponent": {
           "Size": 10,
           "Health": 100.0,
-          "PlayerSpeed": 100,
-          "ReloadTime": 0.005,
+          "PlayerSpeed": 300,
+          "ReloadTime": 0.25,
+          "Sprite": {
+            "Sheet": "space.sprite.json",
+            "Frame": 0,
+            "Rotation" :  90
+          },
           "BulletPrefab": "bullet.prefab.json"
         }
       }

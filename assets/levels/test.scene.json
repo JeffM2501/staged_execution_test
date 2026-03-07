@@ -26,8 +26,8 @@
         "NPCSpawnComponent": {
           "NPCPrefab": "npc.prefab.json",
           "Interval": [ 1, 3 ],
-          "Velocity": [ 200, 400 ],
-          "MaxSpawnCount": 100
+          "Velocity": [ 100, 200 ],
+          "MaxSpawnCount": 20
         }
       }
     }

@@ -2,7 +2,6 @@
 	"Image": "simpleSpace_tilesheet@2.png",
 	"FrameType": "Grid",
 	"GridInfo" : {
-		"NameType" : "Index",
 		"Width" : 8,
 		"Height" : 6
 	},

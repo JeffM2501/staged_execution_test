@@ -15,7 +15,12 @@
           "Size": 4,
           "Damage": 10.0,
           "Lifetime": 3.0,
-          "Tint" : [ 255, 255, 0, 255 ]
+          "Tint": [ 255, 255, 0, 255 ],
+          "Sprite": {
+            "Sheet": "space.sprite.json",
+            "Frame": 31,
+            "Rotation": 90
+          }
         }
       }
     }

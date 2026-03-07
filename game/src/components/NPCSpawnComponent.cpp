@@ -13,7 +13,7 @@ void NPCSpawnComponent::OnAwake()
     {
         PrefabReader.ReadEntitiesFromResource(NPCPrefab, [this](std::span<size_t> entities)
             {
-                float size = float(GetRandomValue(10, 30));
+                float size = float(GetRandomValue(50, 200)) / 100.0f;
 
                 auto npcTransform = EntitySystem::GetEntityComponent<TransformComponent>(entities[0]);
                 if (npcTransform)

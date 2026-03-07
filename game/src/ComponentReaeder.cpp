@@ -29,6 +29,8 @@ void ComponentReader::OnComponentData(EntitySystem::EntityComponent* component, 
         player->ReloadTime = buffer.Read<float>();
         player->BulletPrefab = buffer.Read<size_t>();
 
+        player->Sprite = SpriteManager::LoadFromBuffer(buffer);
+
         TraceLog(LOG_INFO, "Loaded PlayerComponent for entity %zu", component->EntityID);
     }
     else if (componentId == NPCComponent::GetComponentId())
@@ -36,6 +38,8 @@ void ComponentReader::OnComponentData(EntitySystem::EntityComponent* component, 
         auto npc = static_cast<NPCComponent*>(component);
         npc->Size = buffer.Read<float>();
         npc->Tint = buffer.ReadColor();
+
+        npc->Sprite = SpriteManager::LoadFromBuffer(buffer);
 
         TraceLog(LOG_INFO, "Loaded NPCComponent for entity %zu", component->EntityID);
     }
@@ -46,6 +50,8 @@ void ComponentReader::OnComponentData(EntitySystem::EntityComponent* component, 
         bullet->Damage = buffer.Read<float>();
         bullet->Lifetime = buffer.Read<float>();
         bullet->Tint = buffer.ReadColor();
+
+        bullet->Sprite = SpriteManager::LoadFromBuffer(buffer);
 
         TraceLog(LOG_INFO, "Loaded BulletComponent for entity %zu", component->EntityID);
     }

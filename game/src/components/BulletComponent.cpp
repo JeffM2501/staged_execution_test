@@ -20,4 +20,12 @@ void BulletComponent::Update()
     {
         transform->Position += transform->Velocity * GetDeltaTime();
     }
+
+    Sprite.Rotation += 500 * GetDeltaTime() * SpinDir;
+    Sprite.Rotation = fmodf(Sprite.Rotation, 360);
+}
+
+void BulletComponent::OnAwake()
+{
+    SpinDir = GetRandomValue(0, 1) == 0 ? -1.0f : 1.0f;
 }
