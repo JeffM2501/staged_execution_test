@@ -4,7 +4,7 @@
 
 void PlayerSpawnComponent::OnAwake()
 {
-    auto transform = GetEntityComponent<TransformComponent>();
+    auto transform = GetEntityComponent<TransformComponent>().Get();
     if (transform)
     {
         Vector2 pos = transform->Position;

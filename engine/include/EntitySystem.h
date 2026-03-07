@@ -9,7 +9,7 @@
 #include <execution>
 #include <mutex>
 #include <vector>
-#include <span>
+#include <memory>
 
 #define DECLARE_COMPONENT(CompoentName) \
 static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); } \
@@ -33,6 +33,52 @@ namespace EntitySystem
     void EnableEntity(size_t entityId, bool enabled);
     void AwakeEntity(size_t entityId);
 
+    struct EntityComponentReference
+    {
+    private:
+        std::atomic_bool Valid = true;
+
+        EntityComponent* Component = nullptr;
+
+    public:
+        bool IsValid() const { return Valid.load() && Component != nullptr; }
+        void Invalidate() 
+        { 
+            Valid = false; Component = nullptr; 
+        }
+
+        template<class T>
+        T* Get() const;
+
+        EntityComponent* GetRawComponent() const { return IsValid() ? Component : nullptr; }    
+
+        EntityComponentReference(EntityComponent* comp) : Component(comp) {};
+
+        // noncopyable
+        EntityComponentReference(const EntityComponentReference&) = delete;
+        EntityComponentReference& operator = (const EntityComponentReference&) = delete;
+    };
+
+    template <class T>
+    struct ComponentReference
+    {
+        std::shared_ptr<EntityComponentReference> Ref;
+
+        ComponentReference(std::shared_ptr<EntityComponentReference> ref) : Ref(ref) {}
+
+        T* Get() const
+        {
+            if (Ref == nullptr || !Ref->IsValid())
+                return nullptr;
+
+            EntityComponent* rawComp = Ref->GetRawComponent();
+            if (rawComp->ComponentId() == T::GetComponentId())
+                return static_cast<T*>(rawComp);
+
+            return nullptr;
+        }
+    };
+
     struct EntityComponent
     {
         size_t EntityID = 0;
@@ -40,6 +86,7 @@ namespace EntitySystem
         EntityComponent(size_t entityId)
             : EntityID(entityId)
         {
+            SelfReference = std::make_shared<EntityComponentReference>(this);
         }
 
         virtual ~EntityComponent() = default;
@@ -50,16 +97,22 @@ namespace EntitySystem
         virtual void OnDisabled() {}
         virtual void OnDestroy() {}
 
-        template<class T>
-        T* AddComponent()
+        void Dispose()
         {
-            return static_cast<T*>(EntitySystem::AddComponent(EntityID, T::GetComponentId()));
+            SelfReference->Invalidate();
+            OnDestroy();
         }
 
         template<class T>
-        T* GetEntityComponent()
+        ComponentReference<T> AddComponent()
         {
-            return static_cast<T*>(EntitySystem::GetEntityComponent(EntityID, T::GetComponentId()));
+            return ComponentReference<T>(EntitySystem::AddComponent(EntityID, T::GetComponentId())->GetReference());
+        }
+
+        template<class T>
+        ComponentReference<T> GetEntityComponent()
+        {
+            return ComponentReference<T>(EntitySystem::GetEntityComponent(EntityID, T::GetComponentId())->GetReference());
         }
 
         template<class T>
@@ -67,7 +120,26 @@ namespace EntitySystem
         {
             return static_cast<T*>(EntitySystem::GetEntityComponent(EntityID, T::GetComponentId()));
         }
+
+        std::shared_ptr<EntityComponentReference> GetReference()
+        {
+            return SelfReference;
+        }
+    private:
+        std::shared_ptr<EntityComponentReference> SelfReference;
     };
+
+    template<class T>
+    T* EntityComponentReference::Get() const
+    {
+        if (!IsValid())
+            return nullptr;
+
+        if (Component->ComponentId() == T::GetComponentId())
+            return static_cast<T*>(Component);
+
+        return nullptr;
+    }
    
     struct IComponentTable
     {
@@ -146,7 +218,7 @@ namespace EntitySystem
             std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             for (auto& component : Components)
             {
-                component.OnDestroy();
+                component.Dispose();
             }
             Components.clear();
             ComponentsByID.clear();
@@ -267,30 +339,30 @@ namespace EntitySystem
     }
 
     template<class T>
-    T* GetFirstComponentOfType()
+    ComponentReference<T> GetFirstComponentOfType()
     {
         ComponentTable<T>* table = GetComponentTable<T>();
         if (!table || table->Components.empty())
-            return nullptr;
+            return ComponentReference<T>(nullptr);
 
-        return &table->Components.front();
+        return ComponentReference<T>(table->Components.front().GetReference());
     }
 
     template<class T, class... Args>
-    T* AddComponent(size_t entityId, Args&&... args)
+    ComponentReference<T> AddComponent(size_t entityId, Args&&... args)
     {
         ComponentTable<T>* table = GetComponentTable<T>();
         if (!table)
             return nullptr;
-        return table->Add(entityId, std::forward<Args>(args)...);
+        return ComponentReference<T>(table->Add(entityId, std::forward<Args>(args)...)->GetReference());
     }
 
     size_t NewEntityId();
 
     template<class T>
-    T* AddComponent(size_t entityId)
+    ComponentReference<T> AddComponent(size_t entityId)
     {
-        return static_cast<T*>(AddComponent(entityId, T::GetComponentId()));
+        return ComponentReference<T>(AddComponent(entityId, T::GetComponentId())->GetReference());
     }
 
     void AwakeAllEntities();

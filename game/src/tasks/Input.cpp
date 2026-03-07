@@ -29,7 +29,7 @@ void InputTask::Tick()
         inputVector = Vector2Normalize(inputVector);
     }
 
-    auto* player = EntitySystem::GetFirstComponentOfType<PlayerComponent>();
+    auto* player = EntitySystem::GetFirstComponentOfType<PlayerComponent>().Get();
     if (player)
     {
         player->Input = inputVector;

@@ -150,7 +150,6 @@ double GetFrameStartTime()
 
 /* TODO
 * Resource Manager preloads
-* Sprite Resource
 * Hierarchical transforms
 * Collisions
 * Action Manager

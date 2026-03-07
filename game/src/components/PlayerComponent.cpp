@@ -10,7 +10,7 @@ void PlayerComponent::OnAwake()
 
 void PlayerComponent::Update()
 {
-    auto transform = GetEntityComponent<TransformComponent>();
+    auto transform = GetEntityComponent<TransformComponent>().Get();
     if (transform)
     {
         transform->Position += Input * PlayerSpeed * GetDeltaTime();

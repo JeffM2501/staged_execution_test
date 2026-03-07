@@ -15,7 +15,7 @@ void BulletComponent::Update()
         return;
     }
 
-    auto transform = GetEntityComponent<TransformComponent>();
+    auto transform = GetEntityComponent<TransformComponent>().Get();
     if (transform)
     {
         transform->Position += transform->Velocity * GetDeltaTime();

@@ -43,7 +43,7 @@ bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const Bou
 
 void NPCComponent::Update()
 {
-    auto transform = GetEntityComponent<TransformComponent>();
+    auto transform = GetEntityComponent<TransformComponent>().Get();
     if (transform)
     {
         float realSize = Sprite.SpriteRef->GetFrameRect(Sprite.CurrentFrame).width * Sprite.Scale;
