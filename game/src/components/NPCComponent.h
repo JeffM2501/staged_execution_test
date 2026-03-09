@@ -3,6 +3,7 @@
 #include "raylib.h"
 
 #include "EntitySystem.h"
+#include "TransformComponent.h"
 #include "SpriteManager.h"
 
 struct NPCComponent : public EntitySystem::EntityComponent
@@ -16,4 +17,6 @@ struct NPCComponent : public EntitySystem::EntityComponent
     SpriteManager::SpriteInstance Sprite;
 
     void Update();
+    void OnAwake() override;
+    bool OnDataRead(BufferReader& buffer) override;
 };

@@ -2,6 +2,7 @@
 
 #include "CRC64.h"
 #include "ResourceManager.h"
+#include "BufferReader.h"
 
 #include <functional>
 #include <memory>
@@ -17,7 +18,7 @@ size_t ComponentId() const override{ return Hashes::CRC64Str(#CompoentName); }
 
 #define DECLARE_SIMPLE_COMPONENT(CompoentName) \
 static size_t GetComponentId() { return Hashes::CRC64Str(#CompoentName); } \
-size_t ComponentId() const override { return Hashes::CRC64Str(#CompoentName);  }\
+size_t ComponentId() const override { return Hashes::CRC64Str(#CompoentName);  } \
 CompoentName(size_t entityId) : EntityComponent(entityId) {}
 
 namespace EntitySystem
@@ -32,23 +33,79 @@ namespace EntitySystem
 
     void EnableEntity(size_t entityId, bool enabled);
     void AwakeEntity(size_t entityId);
+    
+    struct EntityComponentReference
+    {
+        std::atomic_bool Valid = true;
+
+        size_t EntityID = 0;
+        size_t ComponentType = 0;
+        EntityComponentReference(size_t entityId, size_t componentType)
+            : EntityID(entityId), ComponentType(componentType)
+        {
+
+        }
+
+        EntityComponent* ComponentCache = nullptr;
+
+        void UpdateCache()
+        {
+            ComponentCache = nullptr;
+        }
+
+        EntityComponent* Get()
+        {
+            if (!Valid)
+                return nullptr;
+            if (ComponentCache)
+                return ComponentCache;
+            
+            ComponentCache = GetEntityComponent(EntityID, ComponentType);
+            return ComponentCache;
+        }
+
+        void Invalidate()
+        {
+            Valid = false;
+            ComponentCache = nullptr;
+        }
+    };
 
     struct EntityComponent
     {
+    private:
+        std::shared_ptr<EntityComponentReference> RootReference;
+    public:
         size_t EntityID = 0;
-
         EntityComponent(size_t entityId)
             : EntityID(entityId)
         {
         }
 
         virtual ~EntityComponent() = default;
-        virtual size_t ComponentId() const = 0;
+        virtual size_t ComponentId() const { return 0; }
 
         virtual void OnAwake() {}
         virtual void OnEnabled() {}
         virtual void OnDisabled() {}
         virtual void OnDestroy() {}
+
+        virtual bool OnDataRead(BufferReader& buffer) { return false; }
+
+        std::shared_ptr<EntityComponentReference> GetReference()
+        {
+            if (RootReference == nullptr)
+                RootReference = std::make_shared<EntityComponentReference>(EntityID, ComponentId());
+
+            return RootReference;
+        }
+
+        void Dispose()
+        {
+            if (RootReference != nullptr)
+                RootReference->Invalidate();
+            OnDestroy();
+        }
 
         template<class T>
         T* AddComponent()
@@ -133,6 +190,8 @@ namespace EntitySystem
 
             // it's in the middle, swap and erase
             std::swap(Components[index], Components.back());
+            Components[index].GetReference()->UpdateCache();
+
             Components.pop_back();
             if (!Components.empty())
             {
@@ -146,7 +205,7 @@ namespace EntitySystem
             std::lock_guard<std::recursive_mutex> lock(ItteratorLock);
             for (auto& component : Components)
             {
-                component.OnDestroy();
+                component.Dispose();
             }
             Components.clear();
             ComponentsByID.clear();
@@ -213,6 +272,29 @@ namespace EntitySystem
             {
                 func(static_cast<T&>(component));
             }, paralel, enabledOnly);
+        }
+    };
+
+    template<class T>
+    class TypedEntityComponentReference
+    {
+    private:
+        std::shared_ptr<EntityComponentReference> Reference;
+    public:
+        void Set(EntityComponent* componet)
+        {
+            if (componet->ComponentId() == T::GetComponentId())
+            {
+                Reference = componet->GetReference();
+            }
+        }
+
+        T* Get()
+        {
+            if (Reference)
+                return static_cast<T*>(Reference->Get());
+
+            return nullptr;
         }
     };
 

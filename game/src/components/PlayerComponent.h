@@ -5,6 +5,7 @@
 
 #include "EntitySystem.h"
 #include "SpriteManager.h"
+#include "TransformComponent.h"
 
 struct PlayerComponent : public EntitySystem::EntityComponent
 {
@@ -34,4 +35,6 @@ struct PlayerComponent : public EntitySystem::EntityComponent
     void Update();
 
     void OnAwake() override;
+
+    bool OnDataRead(BufferReader& buffer) override;
 };

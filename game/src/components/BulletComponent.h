@@ -2,10 +2,10 @@
 #pragma once
 
 #include "raylib.h"
-#include "raymath.h"
 #include "SpriteManager.h"
 
 #include "EntitySystem.h"
+#include "TransformComponent.h"
 
 struct BulletComponent : public EntitySystem::EntityComponent
 {
@@ -25,4 +25,5 @@ struct BulletComponent : public EntitySystem::EntityComponent
     void Update();
 
     void OnAwake() override;
+    bool OnDataRead(BufferReader& buffer) override;
 };

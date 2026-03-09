@@ -9,6 +9,9 @@
 
 void ComponentReader::OnComponentData(EntitySystem::EntityComponent* component, size_t componentId, BufferReader& buffer)
 {
+    if (component->OnDataRead(buffer))
+        return;
+
     // find the deserializer and call it
     if (componentId == TransformComponent::GetComponentId())
     {

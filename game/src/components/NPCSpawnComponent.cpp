@@ -37,6 +37,17 @@ void NPCSpawnComponent::OnAwake()
 
 void NPCSpawnComponent::Update()
 {
+}
 
-    
+bool NPCSpawnComponent::OnDataRead(BufferReader& buffer)
+{
+    MinInterval = buffer.Read<float>();
+    MaxInterval = buffer.Read<float>();
+    MinVelocity = buffer.Read<float>();
+    MaxVelocity = buffer.Read<float>();
+    MaxSpawnCount = buffer.Read<uint32_t>();
+    NPCPrefab = buffer.Read<size_t>();
+    TraceLog(LOG_INFO, "Loaded NPCSpawnComponent for entity %zu", EntityID);
+
+    return true;
 }

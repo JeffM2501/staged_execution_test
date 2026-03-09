@@ -41,6 +41,10 @@ bool MoveEntity(TransformComponent& entity, float size, Vector2 delta, const Bou
     return hit;
 }
 
+void NPCComponent::OnAwake()
+{
+}
+
 void NPCComponent::Update()
 {
     auto transform = GetEntityComponent<TransformComponent>();
@@ -51,4 +55,16 @@ void NPCComponent::Update()
         MoveEntity(*transform, realSize*0.5f, transform->Velocity * delta, WorldBounds.load());
         LastUpdateTime = GetFrameStartTime();
     }
+}
+
+bool NPCComponent::OnDataRead(BufferReader& buffer)
+{
+    Size = buffer.Read<float>();
+    Tint = buffer.ReadColor();
+
+    Sprite = SpriteManager::LoadFromBuffer(buffer);
+
+    TraceLog(LOG_INFO, "Loaded NPCComponent for entity %zu", EntityID);
+
+    return true;
 }

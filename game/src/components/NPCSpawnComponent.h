@@ -22,4 +22,6 @@ struct NPCSpawnComponent : public EntitySystem::EntityComponent
     void OnAwake() override;
 
     void Update();
+
+    bool OnDataRead(BufferReader& buffer) override;
 };

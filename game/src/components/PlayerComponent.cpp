@@ -6,12 +6,29 @@
 
 void PlayerComponent::OnAwake()
 {
+   // Transform.Set(GetEntityComponent<TransformComponent>());
+}
+
+bool PlayerComponent::OnDataRead(BufferReader& buffer)
+{
+    Size = buffer.Read<float>();
+    Health = buffer.Read<float>();
+    PlayerSpeed = buffer.Read<float>();
+    ReloadTime = buffer.Read<float>();
+    BulletPrefab = buffer.Read<size_t>();
+    ShotSpread = buffer.Read<float>();
+    ShotSpeedMultiplyer = buffer.Read<float>();
+    ShotSpeedVariance = buffer.Read<float>();
+
+    Sprite = SpriteManager::LoadFromBuffer(buffer);
+
+    TraceLog(LOG_INFO, "Loaded PlayerComponent for entity %zu", EntityID);
+    return true;
 }
 
 void PlayerComponent::Update()
 {
     auto transform = GetEntityComponent<TransformComponent>();
-    if (transform)
     {
         transform->Position += Input * PlayerSpeed * GetDeltaTime();
 

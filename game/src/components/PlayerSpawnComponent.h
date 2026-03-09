@@ -13,4 +13,5 @@ struct PlayerSpawnComponent : public EntitySystem::EntityComponent
     size_t PlayerPrefab = 0;
 
     void OnAwake() override;
+    bool OnDataRead(BufferReader& buffer);
 };

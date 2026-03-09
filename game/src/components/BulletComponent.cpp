@@ -29,3 +29,16 @@ void BulletComponent::OnAwake()
 {
     SpinDir = GetRandomValue(0, 1) == 0 ? -1.0f : 1.0f;
 }
+
+bool BulletComponent::OnDataRead(BufferReader& buffer)
+{
+    Size = buffer.Read<float>();
+    Damage = buffer.Read<float>();
+    Lifetime = buffer.Read<float>();
+    Tint = buffer.ReadColor();
+
+    Sprite = SpriteManager::LoadFromBuffer(buffer);
+
+    TraceLog(LOG_INFO, "Loaded BulletComponent for entity %zu", EntityID);
+    return true;
+}

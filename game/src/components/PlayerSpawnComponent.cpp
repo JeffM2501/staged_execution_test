@@ -15,3 +15,12 @@ void PlayerSpawnComponent::OnAwake()
             });
     }
 }
+
+bool PlayerSpawnComponent::OnDataRead(BufferReader& buffer)
+{
+    PlayerPrefab = buffer.Read<size_t>();
+
+    TraceLog(LOG_INFO, "Loaded PlayerSpawnComponent for entity %zu", EntityID);
+    return true;
+}
+

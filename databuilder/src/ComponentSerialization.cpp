@@ -7,7 +7,6 @@
 
 namespace ComponentSerialization
 {
-
     void SeralizeSpriteReference(const std::string& name, const rapidjson::Value& value, std::vector<uint8_t>& out)
     {
         auto spriteIt = value.FindMember(name.c_str());
