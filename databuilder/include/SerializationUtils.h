@@ -9,24 +9,37 @@
 #include "CRC64.h"
 
 
-template<typename T>
-inline void WriteToOut(const T& value, std::vector<uint8_t>& out)
+class BufferWriter
 {
-    out.insert(out.end(),
-        reinterpret_cast<const uint8_t*>(&value),
-        reinterpret_cast<const uint8_t*>(&value) + sizeof(T));
-}
+public:
+    std::vector<uint8_t> Buffer;
 
-template<typename T>
-inline void WriteArrayToOut(const std::vector<T>& value, std::vector<uint8_t>& out)
-{
-    for (auto c : value)
+    template<typename T>
+    inline void Write(const T& value)
     {
-        out.insert(out.end(),
-            reinterpret_cast<const uint8_t*>(&c),
-            reinterpret_cast<const uint8_t*>(&c) + sizeof(T));
+        Buffer.insert(Buffer.end(),
+            reinterpret_cast<const uint8_t*>(&value),
+            reinterpret_cast<const uint8_t*>(&value) + sizeof(T));
     }
-}
+
+    template<typename T>
+    inline void WriteArray(const std::vector<T>& value)
+    {
+        for (auto c : value)
+        {
+            Buffer.insert(Buffer.end(),
+                reinterpret_cast<const uint8_t*>(&c),
+                reinterpret_cast<const uint8_t*>(&c) + sizeof(T));
+        }
+    }
+
+    inline void WriteBufferr(BufferWriter& buffer)
+    {
+        uint32_t size = uint32_t(buffer.Buffer.size());
+        Write(size);
+        Buffer.insert(Buffer.end(), buffer.Buffer.begin(), buffer.Buffer.end());
+    }
+};
 
 inline bool ReadColor(uint8_t color[4], const rapidjson::Value& colorValue)
 {
@@ -73,15 +86,15 @@ inline bool ReadValueNumberArray(std::string_view name, std::span<T> out, const 
 }
 
 template<typename T>
-inline void SerializeNumber(std::string_view name, T defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
+inline void SerializeNumber(std::string_view name, T defaultValue, const rapidjson::Value& value, BufferWriter& out)
 {
     T binValue = defaultValue;
     ReadValueNumber(name, binValue, value);
-    WriteToOut(binValue, out);
+    out.Write(binValue);
 }
 
 template<typename T>
-inline void SerializeNumberArray(std::string_view name, const std::vector<T>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
+inline void SerializeNumberArray(std::string_view name, const std::vector<T>& defaultValue, const rapidjson::Value& value, BufferWriter& out)
 {
     // Make a mutable copy initialized from the provided default.
     std::vector<T> binValue = defaultValue;
@@ -93,10 +106,10 @@ inline void SerializeNumberArray(std::string_view name, const std::vector<T>& de
     ReadValueNumberArray<T>(name, binSpan, value);
 
     // Serialize the resulting numeric array to output.
-    WriteArrayToOut<T>(binValue, out);
+    out.WriteArray<T>(binValue);
 }
 
-inline void SerializeColor(std::string_view name, const std::vector<uint8_t>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
+inline void SerializeColor(std::string_view name, const std::vector<uint8_t>& defaultValue, const rapidjson::Value& value, BufferWriter& out)
 {
     // Make a mutable copy initialized from the provided default.
     std::vector<uint8_t> binValue = defaultValue;
@@ -105,7 +118,7 @@ inline void SerializeColor(std::string_view name, const std::vector<uint8_t>& de
     if (it != value.MemberEnd() && it->value.IsArray())
     {
         const auto& valueArray = it->value;
-        for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < out.size(); ++i)
+        for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < defaultValue.size(); ++i)
         {
             if (valueArray[i].IsNumber())
                 binValue[i] = uint8_t(valueArray[i].GetUint());
@@ -113,10 +126,10 @@ inline void SerializeColor(std::string_view name, const std::vector<uint8_t>& de
     }
 
     // Serialize the resulting numeric array to output.
-    WriteArrayToOut<uint8_t>(binValue, out);
+    out.WriteArray<uint8_t>(binValue);
 }
 
-inline void SerializeRectangle(std::string_view name, const std::vector<float>& defaultValue, const rapidjson::Value& value, std::vector<uint8_t>& out)
+inline void SerializeRectangle(std::string_view name, const std::vector<float>& defaultValue, const rapidjson::Value& value, BufferWriter& out)
 {
     // Make a mutable copy initialized from the provided default.
     std::vector<float> binValue = defaultValue;
@@ -125,7 +138,7 @@ inline void SerializeRectangle(std::string_view name, const std::vector<float>& 
     if (it != value.MemberEnd() && it->value.IsArray())
     {
         const auto& valueArray = it->value;
-        for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < out.size(); ++i)
+        for (rapidjson::SizeType i = 0; i < valueArray.Size() && i < defaultValue.size(); ++i)
         {
             if (valueArray[i].IsNumber())
                 binValue[i] = valueArray[i].GetFloat();
@@ -133,10 +146,10 @@ inline void SerializeRectangle(std::string_view name, const std::vector<float>& 
     }
 
     // Serialize the resulting numeric array to output.
-    WriteArrayToOut(binValue, out);
+    out.WriteArray(binValue);
 }
 
-inline void SeralizeAssetReference(std::string_view name, const rapidjson::Value& value, std::vector<uint8_t>& out)
+inline void SeralizeAssetReference(std::string_view name, const rapidjson::Value& value, BufferWriter& out)
 {
     // Make a mutable copy initialized from the provided default.
     size_t nameValue = 0;
@@ -148,7 +161,7 @@ inline void SeralizeAssetReference(std::string_view name, const rapidjson::Value
     }
 
     // Serialize the resulting numeric array to output.
-    WriteToOut<size_t>(nameValue, out);
+    out.Write<size_t>(nameValue);
 }
 
 template<typename T>
